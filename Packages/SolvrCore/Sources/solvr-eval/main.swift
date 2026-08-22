@@ -28,6 +28,7 @@ struct Options {
     var model = "claude-opus-5"
     var keyEnv = "ANTHROPIC_API_KEY"
     var maxTokens = 2048
+    var baseURL: String?
 }
 
 func parseOptions() -> Options {
@@ -50,6 +51,7 @@ func parseOptions() -> Options {
         case "--model": o.model = value()
         case "--key-env": o.keyEnv = value()
         case "--max-tokens": o.maxTokens = Int(value()) ?? o.maxTokens
+        case "--base-url": o.baseURL = value()
         case "--help", "-h":
             print("""
             solvr-eval --backend <demo|anthropic|anthropic-constrained>
@@ -58,6 +60,12 @@ func parseOptions() -> Options {
 
             Backends:
               demo                    bundled fixtures, no key, no network, no spend
+              local                   an OpenAI-compatible endpoint you run, via
+                                      --base-url and --model. This is how the
+                                      fine-tuned model is measured, and the one
+                                      backend that cannot be schema-constrained
+                                      by mlx_lm.server -- so the repair ladder is
+                                      load-bearing here and nowhere else.
               anthropic               the hosted API as the app calls it today,
                                       asking the prompt for JSON
               anthropic-constrained   the same prompt plus output_config.format,
@@ -197,6 +205,20 @@ case "anthropic", "anthropic-constrained":
                              usesStructuredOutputs: options.backend == "anthropic-constrained"),
         apiKey: { key },
         isOnline: { true },
+        observe: { m in Task { await telemetry.record(m) } })
+case "local", "local-constrained":
+    guard let raw = options.baseURL, let url = URL(string: raw) else {
+        FileHandle.standardError.write(Data("--backend local requires --base-url\n".utf8))
+        exit(1)
+    }
+    provider = LocalServerProvider(
+        configuration: .init(baseURL: url,
+                             model: options.model,
+                             maxTokens: options.maxTokens,
+                             timeout: 300,
+                             bearerToken: ProcessInfo.processInfo
+                                 .environment["SOLVR_LOCAL_TOKEN"],
+                             usesResponseFormat: options.backend == "local-constrained"),
         observe: { m in Task { await telemetry.record(m) } })
 default:
     FileHandle.standardError.write(Data("unknown backend \(options.backend)\n".utf8))

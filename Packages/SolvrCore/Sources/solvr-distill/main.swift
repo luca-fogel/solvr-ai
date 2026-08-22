@@ -21,6 +21,9 @@ struct Options {
     var output = "tools/finetune/data/raw.jsonl"
     var model = "claude-opus-5"
     var keyEnv = "ANTHROPIC_API_KEY"
+    /// `anthropic`, or any OpenAI-compatible endpoint via `--base-url`.
+    var teacher = "anthropic"
+    var baseURL: String?
     var limit: Int?
     var surfaces = ["steps", "lesson", "formulas", "videos"]
     var confirmSpend = false
@@ -43,6 +46,8 @@ func parse() -> Options {
         case "--out": o.output = value()
         case "--model": o.model = value()
         case "--key-env": o.keyEnv = value()
+        case "--teacher": o.teacher = value()
+        case "--base-url": o.baseURL = value()
         case "--limit": o.limit = Int(value())
         case "--surfaces": o.surfaces = value().split(separator: ",").map(String.init)
         case "--concurrency": o.concurrency = Int(value()) ?? o.concurrency
@@ -51,9 +56,18 @@ func parse() -> Options {
             print("""
             solvr-distill [--limit N] [--surfaces steps,lesson,formulas,videos]
                           [--model ID] [--out file.jsonl] --confirm-spend
+                          [--teacher anthropic|openai --base-url URL]
 
-            Generates fine-tuning targets by asking the hosted model the app's own
-            prompts, with output_config.format so the shape is guaranteed.
+            Generates fine-tuning targets by asking a strong model the app's own
+            prompts, with the response shape constrained by a schema so no target
+            needs repairing before it becomes training data.
+
+            Teachers:
+              anthropic            Messages API, output_config.format
+              openai               any OpenAI-compatible endpoint, response_format
+                                   --base-url https://api.example.com
+                                   --key-env  THEIR_API_KEY
+                                   --model    their-model-id
 
             Billed. Prints an estimate and refuses to run without --confirm-spend,
             because it is not this tool's money.
@@ -111,11 +125,12 @@ let price: (Double, Double) = {
 let estimate = (estimatedInput * price.0 + estimatedOutput * price.1) / 1e6
 
 print("""
+    teacher:    \(options.teacher)\(options.baseURL.map { " (\($0))" } ?? "")
     model:      \(options.model)
     problems:   \(problems.count)
     surfaces:   \(options.surfaces.joined(separator: ", "))
     requests:   \(calls)
-    estimate:   ~$\(String(format: "%.2f", estimate))  (rough; actual is reported from usage)
+    estimate:   \(options.teacher == "anthropic" ? "~$" + String(format: "%.2f", estimate) + "  (rough; actual is reported from usage)" : "unknown -- this teacher's pricing is not in the table")
     output:     \(options.output)
     """)
 
@@ -128,11 +143,34 @@ guard options.confirmSpend else {
 }
 print("")
 
-/// Structured outputs on, so the response shape is guaranteed and the target
-/// never needs repairing before it becomes training data.
-let provider = AnthropicProvider(
-    configuration: .init(model: options.model, maxTokens: 3000, usesStructuredOutputs: true),
-    apiKey: { key })
+/// Structured outputs on either way, so the response shape is guaranteed and the
+/// target never needs repairing before it becomes training data.
+///
+/// Two teachers, one code path downstream. The prompts and the JSON schemas are
+/// shared; only the request envelope differs, which is the whole reason
+/// `LocalServerProvider` speaks a schema at all.
+let provider: any SolutionProvider = {
+    switch options.teacher {
+    case "anthropic":
+        return AnthropicProvider(
+            configuration: .init(model: options.model, maxTokens: 3000,
+                                 usesStructuredOutputs: true),
+            apiKey: { key })
+    case "openai":
+        guard let raw = options.baseURL, let url = URL(string: raw) else {
+            FileHandle.standardError.write(Data(
+                "--teacher openai requires --base-url\n".utf8))
+            exit(2)
+        }
+        return LocalServerProvider(configuration: .init(
+            baseURL: url, model: options.model, maxTokens: 3000,
+            timeout: 300, bearerToken: key, usesResponseFormat: true))
+    default:
+        FileHandle.standardError.write(Data(
+            "unknown --teacher \(options.teacher)\n".utf8))
+        exit(2)
+    }
+}()
 
 let encoder = JSONEncoder()
 encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]

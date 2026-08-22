@@ -15,6 +15,8 @@ enum ProviderFactory {
         case anthropic
         /// Apple's on-device model. No key, no network, nothing leaves the phone.
         case appleOnDevice
+        /// A model you serve yourself, reached over the local network or a tailnet.
+        case localServer
 
         var id: String { rawValue }
 
@@ -22,6 +24,7 @@ enum ProviderFactory {
             switch self {
             case .anthropic: return "Anthropic API"
             case .appleOnDevice: return "On this device"
+            case .localServer: return "My own server"
             }
         }
 
@@ -34,6 +37,10 @@ enum ProviderFactory {
                 return "Apple Intelligence, running on your iPhone. No key, no network, "
                      + "nothing leaves the device. Photos are read by on-device text "
                      + "recognition first, which is weaker on handwriting."
+            case .localServer:
+                return "A model on your own machine. Needs that machine awake and "
+                     + "reachable. Nothing goes to a third party, and this is the "
+                     + "only backend whose output has to be repaired before use."
             }
         }
     }
@@ -66,6 +73,7 @@ enum ProviderFactory {
         switch backend {
         case .anthropic: return anthropic()
         case .appleOnDevice: return onDevice
+        case .localServer: return localServer()
         }
     }
 
@@ -88,6 +96,38 @@ enum ProviderFactory {
     /// provider rebuilt per request could never warm it. The *selection* is still
     /// resolved per request, so the Settings picker stays live.
     static let onDevice = OnDeviceProvider()
+
+    // MARK: - Local server
+
+    /// Configuration, never compiled in. A home hostname or a tailnet address
+    /// does not belong in a repository, so both live in `UserDefaults` and the
+    /// token lives in the Keychain under its own account -- not the Anthropic one.
+    static let localServerURLKey = "localServerURL"
+    static let localServerModelKey = "localServerModel"
+
+    static var localServerURLString: String {
+        UserDefaults.standard.string(forKey: localServerURLKey) ?? ""
+    }
+
+    static var localServerModel: String {
+        let stored = UserDefaults.standard.string(forKey: localServerModelKey) ?? ""
+        return stored.isEmpty ? "local" : stored
+    }
+
+    static func localServer(usesResponseFormat: Bool = false,
+                            observe: LocalServerProvider.Observer? = nil) -> LocalServerProvider {
+        // A URL that will not parse becomes loopback rather than a crash; the
+        // request then fails with "could not reach your local server", which is
+        // the sentence the user needs either way.
+        let url = URL(string: localServerURLString) ?? URL(string: "http://127.0.0.1:8131")!
+        return LocalServerProvider(
+            configuration: .init(baseURL: url,
+                                 model: localServerModel,
+                                 maxTokens: maxTokens,
+                                 bearerToken: KeychainManager.retrieve(.localServer),
+                                 usesResponseFormat: usesResponseFormat),
+            observe: observe)
+    }
 
     /// Why the on-device backend cannot be used right now, or `nil` if it can.
     /// Surfaced in Settings, because "Apple Intelligence is off" is the user's to

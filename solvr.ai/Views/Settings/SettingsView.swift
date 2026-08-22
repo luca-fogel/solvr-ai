@@ -12,6 +12,10 @@ struct SettingsView: View {
     @State private var saveFailed = false
     @State private var showClearConfirm = false
     @AppStorage(ProviderFactory.backendKey) private var backend: String = ProviderFactory.Backend.anthropic.rawValue
+    @AppStorage(ProviderFactory.localServerURLKey) private var localServerURL: String = ""
+    @AppStorage(ProviderFactory.localServerModelKey) private var localServerModel: String = ""
+    @State private var localToken: String = ""
+    @State private var localTokenSaved = false
     @AppStorage("selectedModel") private var selectedModel: String = "claude-opus-5"
     @AppStorage("maxTokens") private var maxTokens: Int = 2048
     @AppStorage(DemoMode.defaultsKey) private var demoMode: Bool = false
@@ -49,7 +53,61 @@ struct SettingsView: View {
                     }
                 }
 
-                // API Key
+                if selectedBackend == .localServer {
+                    Section("My server") {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Address")
+                                .font(Theme.Fonts.caption)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            TextField("https://my-mac.example.ts.net", text: $localServerURL)
+                                .font(Theme.Fonts.math(14))
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            // Not a compiled constant, and not committed: a home
+                            // hostname or tailnet address belongs to the person
+                            // who owns it, not to the repository.
+                            Text("An OpenAI-compatible endpoint. Plain http works on "
+                                 + "a local network; over a tailnet prefer https so "
+                                 + "the token is not sent in the clear.")
+                                .font(Theme.Fonts.caption)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Model name")
+                                .font(Theme.Fonts.caption)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            TextField("solvr-qwen3-4b", text: $localServerModel)
+                                .font(Theme.Fonts.math(14))
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Token (optional)")
+                                .font(Theme.Fonts.caption)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            SecureField("bearer token", text: $localToken)
+                                .font(Theme.Fonts.math(14))
+                            Button {
+                                // Its own Keychain account, so saving this cannot
+                                // overwrite the Anthropic key.
+                                localTokenSaved = KeychainManager.save(
+                                    apiKey: localToken, for: .localServer)
+                            } label: {
+                                Label(localTokenSaved ? "Saved" : "Save token",
+                                      systemImage: localTokenSaved
+                                        ? "checkmark.circle.fill" : "key.fill")
+                            }
+                            .disabled(localToken.isEmpty)
+                            .tint(Theme.Colors.accent)
+                        }
+                    }
+                }
+
+                // API Key. Shown for the backend that needs one; the on-device
+                // model and a token-free local server do not.
+                if selectedBackend == .anthropic {
                 Section("API Configuration") {
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         Text("Anthropic API Key")
@@ -110,6 +168,7 @@ struct SettingsView: View {
                             .font(Theme.Fonts.caption)
                             .foregroundStyle(Theme.Colors.error)
                     }
+                }
                 }
 
                 // Model

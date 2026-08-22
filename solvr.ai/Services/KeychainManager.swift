@@ -15,17 +15,25 @@ import Security
 enum KeychainManager {
 
     private static let service = "ai.solvr.apikey"
-    private static let account = "anthropic-api-key"
+
+    /// Which credential. One service, several accounts: the Anthropic key and a
+    /// local server's bearer token are different secrets and must not overwrite
+    /// each other, which the previous single hardcoded account guaranteed they
+    /// would.
+    enum Account: String {
+        case anthropic = "anthropic-api-key"
+        case localServer = "local-server-token"
+    }
 
     /// Only read from and deleted, never written. Present so a key stored by an
     /// older build can be rescued out of it.
     private static let legacyFallbackKey = "solvr_api_key_fallback"
 
-    private static func baseQuery() -> [String: Any] {
+    private static func baseQuery(_ account: Account) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: account.rawValue,
         ]
         #if targetEnvironment(macCatalyst)
         // Catalyst needs the data protection keychain explicitly, or the item
@@ -38,12 +46,12 @@ enum KeychainManager {
     /// Returns false if the key could not be stored securely. Callers must show
     /// that to the user rather than treating it as success.
     @discardableResult
-    static func save(apiKey: String) -> Bool {
-        delete()
+    static func save(apiKey: String, for account: Account = .anthropic) -> Bool {
+        delete(account)
 
         guard let data = apiKey.data(using: .utf8) else { return false }
 
-        var query = baseQuery()
+        var query = baseQuery(account)
         query[kSecValueData as String] = data
         // After first unlock rather than always: the app has no reason to read
         // the key while the device is locked.
@@ -58,8 +66,8 @@ enum KeychainManager {
         return true
     }
 
-    static func retrieve() -> String? {
-        var query = baseQuery()
+    static func retrieve(_ account: Account = .anthropic) -> String? {
+        var query = baseQuery(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -70,18 +78,26 @@ enum KeychainManager {
             return key
         }
 
+        // Only the Anthropic key ever had a plaintext predecessor. Without this
+        // guard, asking for the local server's token and finding none would fall
+        // through and hand back the Anthropic key instead -- the wrong secret,
+        // sent to a different host.
+        guard account == .anthropic else { return nil }
         return migrateLegacyKeyIfPresent()
     }
 
     /// Move a key left in `UserDefaults` by an older build into the Keychain,
     /// then remove it. Returns the key either way -- failing to migrate is not a
     /// reason to lock someone out of their own app.
+    ///
+    /// Hardcoded to `.anthropic`: it is the only account that ever had a
+    /// plaintext predecessor, and the caller guards on that.
     private static func migrateLegacyKeyIfPresent() -> String? {
         guard let legacy = UserDefaults.standard.string(forKey: legacyFallbackKey),
               !legacy.isEmpty
         else { return nil }
 
-        var query = baseQuery()
+        var query = baseQuery(.anthropic)
         query[kSecValueData as String] = Data(legacy.utf8)
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -96,13 +112,13 @@ enum KeychainManager {
     }
 
     @discardableResult
-    static func delete() -> Bool {
-        let status = SecItemDelete(baseQuery() as CFDictionary)
+    static func delete(_ account: Account = .anthropic) -> Bool {
+        let status = SecItemDelete(baseQuery(account) as CFDictionary)
         UserDefaults.standard.removeObject(forKey: legacyFallbackKey)
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
-    static var hasAPIKey: Bool {
-        retrieve() != nil
+    static func hasKey(for account: Account = .anthropic) -> Bool {
+        retrieve(account) != nil
     }
 }

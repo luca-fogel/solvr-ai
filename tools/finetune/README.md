@@ -35,6 +35,43 @@ Gemma 4's per-layer-embedding quantization hazard.
 therefore takes the same dataset and the same recipe. Train 4B first, then the
 1.7B sibling from the identical data.
 
+## Choosing the teacher
+
+The pipeline takes either, through the same downstream code, because the prompts
+and the JSON schemas are shared and only the request envelope differs:
+
+```sh
+# Anthropic Messages API, output_config.format
+export ANTHROPIC_API_KEY=...
+swift run solvr-distill --confirm-spend                       # ~$41.60 for 400 problems
+
+# Any OpenAI-compatible endpoint, response_format
+export MOONSHOT_API_KEY=...
+swift run solvr-distill --teacher openai \
+    --base-url https://api.moonshot.ai/v1 \
+    --key-env MOONSHOT_API_KEY --model <their-model-id> --confirm-spend
+```
+
+A cheaper teacher is a real option and the cost difference is large. Two things to
+be clear about before committing a whole run to one:
+
+**The student inherits the teacher.** Every weakness in step decomposition, in
+lesson structure, in LaTeX, is copied. This is the one decision in the project
+that cannot be fixed later by better engineering.
+
+**So measure it rather than assume it.** The pipeline already does most of this
+for free: `validate_targets.mjs` renders every LaTeX string a teacher produces and
+drops the example if it fails, and reports the drop rate. A teacher producing
+LaTeX that does not render will announce itself. Run `--limit 20` first (~80
+requests), read the drop rate, hand-check five targets, and only then commit to
+400. That costs a dollar or two and replaces an argument with a number.
+
+Note also that a compatibility layer implements the *core* of an API, not
+necessarily its recent additions. If `response_format` is silently ignored, the
+targets come back as prose JSON rather than valid-by-construction — recoverable,
+because `LLMJSON` will rescue them, but the guarantee the plan leans on is gone.
+The drop rate and the compliance record will both show it.
+
 ## Data
 
 `data/{train,valid,test}.jsonl`, in `mlx_lm.lora`'s chat format — one JSON object
