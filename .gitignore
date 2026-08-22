@@ -46,3 +46,6 @@ tools/finetune/adapters/
 # Generated status page (regenerate with tools/status/status.sh --html)
 docs/run-status.html
 tools/finetune/adapters-525/*.safetensors
+
+# Internal handover, kept outside the repo (names a key id and a local security note)
+docs/HANDOVER.md

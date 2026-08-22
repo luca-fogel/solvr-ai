@@ -137,6 +137,20 @@ model usable, which is close to the opposite of the usual framing.
 real key — roughly 43 problems x 3 surfaces x 2 arms — and that is the owner's
 call, not the harness's. The command is below.
 
+## Nothing hosted has been run
+
+Stated before the numbers, because a document full of tables invites the
+assumption that the tables were filled in. **No hosted evaluation has been
+executed.** The constrained-vs-unconstrained comparison described above is a
+method, and the command for it spends money, which is why it is deliberately
+awkward to run by accident.
+
+The first local three-arm comparison was also void, and the reason is worth
+recording: a port race left all three arms talking to the same server, so all
+three "models" produced 129 byte-identical outputs. Byte-identical answers across
+three supposedly different models is the signature to look for — the harness now
+fingerprints each arm before trusting a run.
+
 ## Results so far: the pipeline, validated against the demo backend
 
 The only backend measured to date is `demo/fixtures`, which needs no key and no

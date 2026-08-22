@@ -6,7 +6,9 @@ A native **iOS and Mac Catalyst** app in Swift and SwiftUI. Point the camera at 
 problem — or type it — and it returns step-by-step working with the reason for
 each step, the concept the question was testing, the formulas involved, and a
 chat to keep asking. Behind one interface it can be backed by more than one
-model, and the comparison between them is measured rather than asserted.
+model — a hosted API, a model served on your own machine, or Apple's on-device
+model — with a harness for comparing them that reports what it has and has not
+actually measured.
 
 ![solvr.ai on iPhone](docs/images/hero.png)
 
@@ -139,9 +141,20 @@ xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' b
 
 ## What it does not do
 
-- **No offline solving.** The maths comes from a hosted model, so no key and no
-  network means demo mode only. Making it run against a local model is the next
-  piece of work.
+- **Not verifiably offline on a device, yet.** Rendering is: there is no CDN
+  reference left in the app and maths renders from the bundle. *Answering* offline
+  works in the simulator through Apple's on-device model — but on a real iPhone
+  that model reports `modelNotReady`, so no solve has ever completed on the
+  device, and on an Apple-silicon host the simulator may be proxying the Mac's own
+  model rather than proving anything about a phone. Treat on-device as built and
+  unproven.
+- **The backend comparison is a harness, not a verdict.** The hosted
+  constrained-vs-unconstrained comparison exists in code and **has never been
+  run** — no Anthropic call has been made by it. The local three-arm comparison's
+  first attempt was void: a port race made all three arms serve the same model,
+  which is visible as 129 byte-identical outputs. So the fine-tuned model is
+  **unmeasured** against the base model except for one 12-problem probe, where
+  steps compliance went 82% → 100% on n=11 and nothing else moved.
 - **No answer verification.** The app does not check the model's arithmetic. It
   is a tutor's explanation, not a proof assistant, and a wrong step will be
   presented as confidently as a right one.
@@ -161,7 +174,10 @@ xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' b
 - [docs/backends.md](docs/backends.md) — the provider interface, why it lives in
   the package, and where the JSON repair ladder actually earns its keep
 - [docs/evaluation.md](docs/evaluation.md) — how the backends are measured, what
-  is deliberately not measured, and how to run it
+  has and has not actually been run, and what is deliberately not measured
+- [tools/finetune/README.md](tools/finetune/README.md) — the LoRA run on a 4B:
+  synthetic problem generation, distillation, and the checkpoint-numbering trap
+  that made "iteration 525" mean something other than it looks like
 
 ## See also
 
