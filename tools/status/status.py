@@ -65,6 +65,15 @@ def read_jsonl(path: pathlib.Path):
     return rows
 
 
+def ledger_tokens():
+    """Exact token counts, once a run has printed its ledger."""
+    out = pathlib.Path("/tmp/distill-run.out")
+    if not out.exists():
+        return None
+    m = re.search(r"tokens:\s+(\d+) in, (\d+) out", out.read_text(errors="replace"))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 def distill_state():
     """Progress, cost and composition of the distillation run."""
     rows = read_jsonl(RAW)
@@ -83,8 +92,20 @@ def distill_state():
     else:
         failures = []
 
-    spend_in = sum(TOKENS.get(s, (450, 800))[0] * n for s, n in by_surface.items())
-    spend_out = sum(TOKENS.get(s, (450, 800))[1] * n for s, n in by_surface.items())
+    # Prefer the run's own ledger over an extrapolation. The estimate was wrong
+    # by 61% on a real run: the per-surface averages came from a six-problem probe,
+    # and --limit takes the *first* six, which were all simple algebra. Integrals
+    # and series reason far more, and reasoning tokens are billed as output. An
+    # estimate built on the cheapest end of the distribution is worse than no
+    # estimate, because it gets believed.
+    ledger = ledger_tokens()
+    if ledger:
+        spend_in, spend_out = ledger
+        estimated = False
+    else:
+        spend_in = sum(TOKENS.get(s, (450, 800))[0] * n for s, n in by_surface.items())
+        spend_out = sum(TOKENS.get(s, (450, 800))[1] * n for s, n in by_surface.items())
+        estimated = True
     cost = (spend_in * PRICE_IN + spend_out * PRICE_OUT) / 1e6
 
     return {
@@ -96,6 +117,7 @@ def distill_state():
         "failureDetail": collections.Counter(f"{s}/{k}" for _, s, k in failures),
         "estimatedCost": cost,
         "tokensIn": spend_in, "tokensOut": spend_out,
+        "costIsEstimate": estimated,
     }
 
 
@@ -175,8 +197,12 @@ def terminal(state):
     if d["failures"]:
         out.append(f"  \033[33mfailed {d['failures']}\033[0m "
                    f"({', '.join(f'{k}:{v}' for k, v in d['failureDetail'].most_common(3))})")
-    out.append(f"  spend (est)       ${d['estimatedCost']:.2f}   "
+    label = "spend (est)  " if d["costIsEstimate"] else "spend (actual)"
+    remaining = 25.0 - d["estimatedCost"]
+    out.append(f"  {label}     ${d['estimatedCost']:.2f}   "
                f"{d['tokensIn'] / 1000:.0f}k in / {d['tokensOut'] / 1000:.0f}k out")
+    warn = "\033[31m" if remaining < 2 else ""
+    out.append(f"  {warn}budget left       ${remaining:.2f}\033[0m")
     out.append("")
 
     # Training
@@ -277,7 +303,8 @@ def render_html(state):
       <div class='row'>
         <div class='stat'><b>{d['examples']}</b><span>examples</span></div>
         <div class='stat'><b>{d['done'] or 0}/{d['total'] or 0}</b><span>requests</span></div>
-        <div class='stat'><b>${d['estimatedCost']:.2f}</b><span>of ${budget:.0f} spent (est)</span></div>
+        <div class='stat'><b>${d['estimatedCost']:.2f}</b><span>of ${budget:.0f} spent{' (est)' if d['costIsEstimate'] else ''}</span></div>
+        <div class='stat'><b>${budget - d['estimatedCost']:.2f}</b><span>budget left</span></div>
         <div class='stat'><b>{d['failures']}</b><span>failed</span></div>
       </div>
       <div class='track'><div class='fill' style='width:{pct:.1f}%'></div></div>
@@ -350,8 +377,10 @@ def render_html(state):
 <p class="muted">Generated {time.strftime('%H:%M:%S')} · refreshes every 10s ·
   regenerate with <span class="mono">tools/status/status.sh --watch</span></p>
 {card("Distillation (Kimi K3)", distill_body,
-      "Spend is estimated from measured per-surface token averages; the exact figure "
-      "comes from the run's own token ledger when it finishes.")}
+      ("Spend is estimated from per-surface averages and has been wrong by 61% before — "
+       "the probe it was built from sampled only the simplest problems. "
+       if d["costIsEstimate"] else "Spend is the run's own token ledger, not an estimate. ")
+      + "Kimi K3 at $3/$15 per Mtok.")}
 {card("LoRA training (Qwen3-4B)", training_body)}
 {card("Evaluation", eval_body)}
 <footer>Reads the pipeline's own artefacts — no separate state to fall out of sync.</footer>

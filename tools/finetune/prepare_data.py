@@ -14,13 +14,34 @@ import hashlib
 import json
 import pathlib
 import random
+import re
 import sys
 
 
+PROBLEM_TEXT = re.compile(r"submitted this problem: '(.*?)'", re.S)
+
+
 def problem_key(example: dict) -> str:
-    """Group by the problem, which is embedded in the prompt."""
+    """Group by the *problem*, not by the prompt.
+
+    This hashed the whole prompt, which silently defeated the entire point:
+    each surface asks for something different, so the four prompts about one
+    problem hash to four different keys and every group held exactly one example.
+    The split was therefore random over examples, which is precisely the
+    memorisation leak splitting by problem exists to prevent -- the steps for a
+    problem in train and its lesson in test.
+
+    All four prompts embed the problem text the same way, via the provider's
+    shared `problemClause`, so that is what to key on.
+    """
     prompt = example["messages"][0]["content"]
-    return hashlib.sha256(prompt.encode()).hexdigest()[:16]
+    found = PROBLEM_TEXT.search(prompt)
+    if found:
+        return hashlib.sha256(found.group(1).strip().encode()).hexdigest()[:16]
+    # No problem text means an image prompt, which carries none. Falling back to
+    # the prompt hash keeps it in its own group rather than merging unrelated
+    # examples, and is loud about it in the summary.
+    return "noproblem-" + hashlib.sha256(prompt.encode()).hexdigest()[:12]
 
 
 def surface_of(example: dict) -> str:
@@ -84,6 +105,12 @@ def main():
     dropped = len(examples) - len(unique)
     print(f"\ndeduplicated: {dropped} exact duplicates removed")
     print(f"problems held out entirely: {n_valid + n_test} of {len(keys)}")
+    ungrouped = sum(1 for k in keys if k.startswith("noproblem-"))
+    if ungrouped:
+        print(f"warning: {ungrouped} examples had no extractable problem text "
+              f"and were grouped alone")
+    sizes = collections.Counter(len(by_problem[k]) for k in keys)
+    print(f"examples per problem: {dict(sorted(sizes.items()))}")
 
 
 if __name__ == "__main__":
