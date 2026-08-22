@@ -42,3 +42,6 @@ eval-*.jsonl
 
 # Fine-tune build products (adapters and fused models are regenerated, not shared)
 tools/finetune/adapters/
+
+# Generated status page (regenerate with tools/status/status.sh --html)
+docs/run-status.html
