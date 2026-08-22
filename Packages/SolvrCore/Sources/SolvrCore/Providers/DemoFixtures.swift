@@ -13,13 +13,13 @@ import Foundation
 ///
 /// Every problem here is synthetic — written for this file, not taken from any
 /// student's work.
-enum DemoFixtures {
+public enum DemoFixtures {
 
-    static let problem = "Evaluate the definite integral of 3x^2 from 0 to 1"
+    public static let problem = "Evaluate the definite integral of 3x^2 from 0 to 1"
 
-    static let title = "Definite integral of 3x²"
+    public static let title = "Definite integral of 3x²"
 
-    static let steps = #"""
+    public static let steps = #"""
     [
       {
         "step": 1,
@@ -48,7 +48,7 @@ enum DemoFixtures {
     ]
     """#
 
-    static let formulas = #"""
+    public static let formulas = #"""
     [
       {
         "name": "Power rule for integration",
@@ -68,7 +68,7 @@ enum DemoFixtures {
     ]
     """#
 
-    static let lesson = #"""
+    public static let lesson = #"""
     {
       "title": "Definite Integrals as Signed Area",
       "topic": "CALCULUS • INTEGRATION",
@@ -112,7 +112,7 @@ enum DemoFixtures {
     }
     """#
 
-    static let videos = #"""
+    public static let videos = #"""
     [
       {
         "title": "Definite integrals: intro",
@@ -131,7 +131,7 @@ enum DemoFixtures {
     ]
     """#
 
-    static let chatReply = """
+    public static let chatReply = """
     Yes - the constant of integration disappears in a definite integral, and it is worth \
     seeing why rather than just remembering it.
 
@@ -140,7 +140,7 @@ enum DemoFixtures {
     number instead of a family of functions - they are the reason the ambiguity goes away.
     """
 
-    static let detectedProblems = #"""
+    public static let detectedProblems = #"""
     [
       {
         "bbox": { "top": 0.18, "left": 0.08, "width": 0.84, "height": 0.14 },

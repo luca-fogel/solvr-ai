@@ -18,7 +18,7 @@ final class ScannerViewModel {
     var selectedProblem: DetectedProblem?
     var errorMessage: String?
 
-    private let api = AnthropicProvider()
+    private let api = ProviderFactory.anthropic()
 
     // MARK: - Capture
 
@@ -48,7 +48,10 @@ final class ScannerViewModel {
 
         Task {
             do {
-                let rawProblems = try await api.detectProblems(in: image)
+                guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
+                    throw SolverError.invalidResponse
+                }
+                let rawProblems = try await api.detectProblems(inImageJPEG: jpeg)
                 let validated = Self.validateBoundingBoxes(rawProblems)
                 let problems = Self.filterDetectedProblems(validated)
                 await MainActor.run {

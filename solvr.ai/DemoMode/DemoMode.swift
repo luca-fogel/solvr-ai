@@ -68,14 +68,4 @@ enum DemoMode {
         try? await Task.sleep(for: simulatedLatency)
     }
 
-    /// Decode a fixture through the production ladder, so demo mode exercises the
-    /// real parser -- including the LaTeX repair, since the fixtures contain the
-    /// raw unescaped backslashes a model actually sends.
-    static func decode<T: Decodable>(_ type: T.Type, from json: String, label: String) throws -> T {
-        guard let decoded = LLMJSON.decode(type, from: json) else {
-            throw SolverError.decodingFailed(
-                context: "demo fixture '\(label)' failed to parse")
-        }
-        return decoded.value
-    }
 }

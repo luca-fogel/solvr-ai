@@ -1,4 +1,5 @@
 import SwiftUI
+import SolvrCore
 
 struct ProblemPreviewSheet: View {
     let image: UIImage

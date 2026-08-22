@@ -1,4 +1,5 @@
 import SwiftUI
+import SolvrCore
 
 struct ProblemDetectionView: View {
     let image: UIImage

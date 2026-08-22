@@ -38,15 +38,53 @@ enum ProviderFactory {
     ///   appear to do nothing until relaunch.
     static func current() -> any SolutionProvider {
         if DemoMode.isEnabled {
-            return DemoSolutionProvider()
+            return FixtureSolutionProvider(latency: DemoMode.simulatedLatency)
         }
         return sighted(backend(for: selectedBackend))
     }
 
     private static func backend(for backend: Backend) -> any SolutionProvider {
         switch backend {
-        case .anthropic: return AnthropicProvider()
+        case .anthropic: return anthropic()
         }
+    }
+
+    /// The provider lives in `SolvrCore` so the evaluation harness can drive the
+    /// same code the app does. Everything platform-specific it used to reach for
+    /// directly is handed to it here.
+    static func anthropic(usesStructuredOutputs: Bool = false,
+                          observe: AnthropicProvider.Observer? = nil) -> AnthropicProvider {
+        AnthropicProvider(
+            configuration: .init(model: selectedModel,
+                                 maxTokens: maxTokens,
+                                 usesStructuredOutputs: usesStructuredOutputs),
+            apiKey: { KeychainManager.retrieve() },
+            isOnline: { NetworkMonitor.shared.isConnected },
+            observe: observe)
+    }
+
+    /// Normalises whatever is in `UserDefaults` onto a model ID that exists.
+    ///
+    /// The old mapping sent Haiku to `claude-haiku-4-5-20251001`; current IDs
+    /// carry no date suffix, so that string is not a model. The `default` branch
+    /// passes unrecognised values straight through -- a previous version rewrote
+    /// them to Sonnet, which would silently discard a local model name stored
+    /// under the same key.
+    private static var selectedModel: String {
+        let stored = UserDefaults.standard.string(forKey: "selectedModel") ?? ""
+        switch stored {
+        case "", "claude-sonnet-4-20250514":
+            return "claude-opus-5"
+        case "claude-haiku-4-20250414", "claude-haiku-4-5-20251001":
+            return "claude-haiku-4-5"
+        default:
+            return stored
+        }
+    }
+
+    private static var maxTokens: Int {
+        let stored = UserDefaults.standard.integer(forKey: "maxTokens")
+        return stored > 0 ? stored : 2048
     }
 
     /// Wrap any backend that cannot look at a photograph so that it can.

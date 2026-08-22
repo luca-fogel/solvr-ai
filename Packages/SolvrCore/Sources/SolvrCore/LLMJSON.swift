@@ -193,28 +193,97 @@ public enum LLMJSON {
         return String(raw[start...end])
     }
 
+    /// Slice without being told the shape.
+    ///
+    /// The shape-taking overload above is still the right call when you know what
+    /// you asked for, but `decode` cannot know, and requiring it to guess is how
+    /// slicing ended up outside the instrument in the first place. Whichever
+    /// bracket opens first wins.
+    public static func sliceJSONBody(_ raw: String) -> String {
+        let firstObject = raw.firstIndex(of: "{")
+        let firstArray = raw.firstIndex(of: "[")
+        let shape: JSONShape
+        switch (firstObject, firstArray) {
+        case (nil, nil):
+            return raw
+        case (_?, nil):
+            shape = .object
+        case (nil, _?):
+            shape = .array
+        case (let object?, let array?):
+            shape = object < array ? .object : .array
+        }
+        return sliceJSONBody(raw, shape: shape)
+    }
+
     // MARK: - The decode ladder
 
-    /// Which rung of the ladder produced a value. Worth carrying: a value that
-    /// needed repair is not as trustworthy as one that parsed on the first try,
-    /// and the caller may want to say so.
+    /// Which rung of the ladder produced a value. Kept as a summary of
+    /// `Compliance`, below, because it reads well in a log line.
     public enum Provenance: String, Sendable {
-        /// Parsed as sent. The model did what it was asked.
+        /// Parsed exactly as sent. The model did what it was asked.
         case strict
-        /// Parsed after fences were stripped and LaTeX escapes repaired.
+        /// Parsed after something had to be done to it first -- a fence removed,
+        /// prose trimmed away, LaTeX escapes repaired.
         case repaired
-        /// Parsed after re-serialising through `JSONSerialization`, which
+        /// Parsed only after re-serialising through `JSONSerialization`, which
         /// normalises escaping that `JSONDecoder` refuses.
         case normalised
     }
 
+    /// What actually had to be done to a response before it would decode.
+    ///
+    /// This exists because `provenance` alone was not measuring what it claimed
+    /// to. It was computed by comparing the repaired string against the
+    /// *post-fence-strip* one, so a response wrapped in a ```json fence reported
+    /// `.strict` -- and slicing prose off the ends happened at the call site,
+    /// outside `decode` entirely, so that was invisible too.
+    ///
+    /// Both blind spots flattered exactly the failures a weaker model is most
+    /// likely to produce. A 4B that fences every response would have scored
+    /// identically to a frontier model emitting bare JSON, which would have made
+    /// the headline number of a backend comparison wrong in the direction that
+    /// looks good. Each step now reports itself.
+    public struct Compliance: Sendable, Equatable {
+        /// The response was wrapped in a markdown code fence.
+        public var wasFenced = false
+        /// Prose around the JSON had to be trimmed away.
+        public var wasSliced = false
+        /// LaTeX backslashes had to be escaped before JSON would accept them.
+        public var escapesRepaired = false
+        /// `JSONDecoder` refused it and it only parsed after a round trip
+        /// through `JSONSerialization`.
+        public var wasNormalised = false
+        /// No JSON was recovered at all and the caller wrapped the prose to fill
+        /// the shape. Set by the caller, since the wrapping happens above here.
+        public var usedPlainTextFallback = false
+
+        public init() {}
+
+        /// The model emitted JSON that needed nothing done to it. This is the
+        /// number worth reporting per surface, and the one to compare across
+        /// backends.
+        public var isClean: Bool {
+            !wasFenced && !wasSliced && !escapesRepaired
+                && !wasNormalised && !usedPlainTextFallback
+        }
+
+        public var provenance: Provenance {
+            if wasNormalised { return .normalised }
+            return isClean ? .strict : .repaired
+        }
+    }
+
     public struct Decoded<T> {
         public let value: T
-        public let provenance: Provenance
+        public let compliance: Compliance
 
-        public init(value: T, provenance: Provenance) {
+        /// Summary of `compliance`.
+        public var provenance: Provenance { compliance.provenance }
+
+        public init(value: T, compliance: Compliance) {
             self.value = value
-            self.provenance = provenance
+            self.compliance = compliance
         }
     }
 
@@ -234,34 +303,53 @@ public enum LLMJSON {
     /// The cost of that choice, stated plainly: a string that legitimately
     /// contains a tab followed by `imes` will be read as `\times`. Accepted --
     /// in this domain the second reading is right far more often.
+    ///
+    /// Fence stripping and prose slicing both happen *here* rather than at the
+    /// call sites, so that everything done to a response is done where it can be
+    /// counted.
     public static func decode<T: Decodable>(_ type: T.Type, from raw: String) -> Decoded<T>? {
+        var compliance = Compliance()
+
+        // Anywhere, not just at the front. A model that writes "Here you go:"
+        // before the fence still fenced its output -- the leading-fence check
+        // this replaces called that case unfenced, and then the slice quietly
+        // removed the fence along with the prose, so the specific thing the
+        // model did wrong went unrecorded. The false-positive risk is a response
+        // legitimately containing a triple backtick, which in maths output is
+        // not a thing that happens.
+        compliance.wasFenced = raw.contains("```")
         let cleaned = stripCodeFences(raw)
-        let repaired = repairLaTeXEscapes(cleaned)
-        // Nothing needed changing: the model emitted JSON with no ambiguous
-        // escapes in it, which is the only case that deserves to be called strict.
-        let provenance: Provenance = repaired == cleaned ? .strict : .repaired
+
+        let sliced = sliceJSONBody(cleaned)
+        compliance.wasSliced = sliced != cleaned
+
+        let repaired = repairLaTeXEscapes(sliced)
+        compliance.escapesRepaired = repaired != sliced
 
         if let data = repaired.data(using: .utf8),
            let v = try? JSONDecoder().decode(type, from: data) {
-            return Decoded(value: v, provenance: provenance)
+            return Decoded(value: v, compliance: compliance)
         }
 
         // If the repair itself made the document unparseable, the original still
         // deserves a try before giving up.
-        if let data = cleaned.data(using: .utf8),
+        if let data = sliced.data(using: .utf8),
            let v = try? JSONDecoder().decode(type, from: data) {
-            return Decoded(value: v, provenance: .strict)
+            var withoutRepair = compliance
+            withoutRepair.escapesRepaired = false
+            return Decoded(value: v, compliance: withoutRepair)
         }
 
         // JSONSerialization accepts some escaping that JSONDecoder rejects, so a
         // round trip through it normalises the document.
-        for candidate in [repaired, cleaned] {
+        for candidate in [repaired, sliced] {
             guard let data = candidate.data(using: .utf8),
                   let object = try? JSONSerialization.jsonObject(with: data),
                   let normalised = try? JSONSerialization.data(withJSONObject: object),
                   let v = try? JSONDecoder().decode(type, from: normalised)
             else { continue }
-            return Decoded(value: v, provenance: .normalised)
+            compliance.wasNormalised = true
+            return Decoded(value: v, compliance: compliance)
         }
         return nil
     }

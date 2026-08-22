@@ -1,4 +1,5 @@
 //  solvr.ai -- step-by-step maths solutions and lesson plans from a photo.
+import SolvrCore
 //  Copyright (C) 2026 Luca Fogel Robion
 //
 //  This program is free software: you can redistribute it and/or modify it under

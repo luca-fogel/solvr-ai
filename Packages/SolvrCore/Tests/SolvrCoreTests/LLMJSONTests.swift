@@ -266,3 +266,86 @@ struct SliceJSONBody {
         #expect(LLMJSON.sliceJSONBody("} then {", shape: .object) == "} then {")
     }
 }
+
+/// The instrument itself, under test.
+///
+/// A backend comparison is only as good as its measure of compliance, and this
+/// measure used to under-report. `provenance` was derived by comparing the
+/// repaired string against the *post-fence-strip* one, so a fence was invisible;
+/// and slicing prose off the ends happened at the call site, so that was
+/// invisible too. Both are the failures a small local model produces most, which
+/// means the error ran in the flattering direction.
+@Suite("What the compliance record measures")
+struct ComplianceInstrument {
+
+    private let bare = #"[{"step":1,"title":"a","explanation":"b","math":null}]"#
+
+    @Test("clean JSON reports nothing done to it")
+    func cleanIsClean() {
+        let out = LLMJSON.decode([Step].self, from: bare)
+        #expect(out?.compliance.isClean == true)
+        #expect(out?.compliance == LLMJSON.Compliance())
+    }
+
+    @Test("a fence is recorded -- it used to report .strict")
+    func fenceIsNoLongerInvisible() {
+        let out = LLMJSON.decode([Step].self, from: "```json\n\(bare)\n```")
+        #expect(out?.compliance.wasFenced == true)
+        #expect(out?.compliance.isClean == false)
+        #expect(out?.provenance != .strict, "a fenced response is not a compliant one")
+    }
+
+    @Test("prose around the JSON is recorded -- it used to happen outside decode")
+    func sliceIsNoLongerInvisible() {
+        let raw = "Sure! Here is the JSON:\n\(bare)\nLet me know if you need anything else."
+        let out = LLMJSON.decode([Step].self, from: raw)
+        #expect(out?.compliance.wasSliced == true)
+        #expect(out?.provenance != .strict)
+        #expect(out?.value.first?.title == "a")
+    }
+
+    @Test("escape repair is recorded separately from fencing and slicing")
+    func repairIsItsOwnSignal() {
+        let raw = #"[{"step":1,"title":"a","explanation":"b","math":"\frac{1}{2}"}]"#
+        let out = LLMJSON.decode([Step].self, from: raw)
+        #expect(out?.compliance.escapesRepaired == true)
+        #expect(out?.compliance.wasFenced == false)
+        #expect(out?.compliance.wasSliced == false)
+    }
+
+    @Test("the three failures are counted independently when they arrive together")
+    func signalsAreIndependent() {
+        let raw = """
+        Here you go:
+        ```json
+        [{"step":1,"title":"a","explanation":"b","math":"\\frac{1}{2}"}]
+        ```
+        Hope that helps.
+        """
+        let out = LLMJSON.decode([Step].self, from: raw)
+        #expect(out?.compliance.wasFenced == true)
+        #expect(out?.compliance.escapesRepaired == true)
+        #expect(out?.value.first?.math == #"\frac{1}{2}"#)
+    }
+
+    @Test("decode slices without being told the shape, for objects and arrays alike")
+    func shapeIsInferred() {
+        let object = LLMJSON.decode(Lesson.self, from: #"Here: {"title":"T","introduction":"i"}"#)
+        #expect(object?.value.title == "T")
+        #expect(object?.compliance.wasSliced == true)
+
+        let array = LLMJSON.decode([Step].self, from: "Here: \(bare)")
+        #expect(array?.value.count == 1)
+        #expect(array?.compliance.wasSliced == true)
+    }
+
+    @Test("isClean is the number to compare across backends, and a fence disqualifies")
+    func isCleanIsTheHeadlineMetric() {
+        let clean = LLMJSON.decode([Step].self, from: bare)
+        let fenced = LLMJSON.decode([Step].self, from: "```\n\(bare)\n```")
+        // Before this change both of these reported .strict, so a model that
+        // fenced every single response scored a perfect compliance rate.
+        #expect(clean?.compliance.isClean == true)
+        #expect(fenced?.compliance.isClean == false)
+    }
+}

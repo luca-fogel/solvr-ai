@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Turns graded results into the table that goes in docs/.
+
+Every number here is reported per surface rather than averaged across them,
+because averaging hides the thing worth seeing: the `videos` surface contains no
+LaTeX at all and scores a perfect compliance rate for free, so a single
+cross-surface average flatters whichever backend is worst at the hard surfaces.
+
+Usage: report.py graded.jsonl [more.jsonl ...]
+"""
+import json
+import statistics
+import sys
+from collections import defaultdict
+
+# Anthropic list prices, USD per million tokens, as of 2026-08.
+PRICES = {
+    "claude-opus-5": (5.0, 25.0),
+    "claude-sonnet-5": (3.0, 15.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "claude-fable-5": (10.0, 50.0),
+}
+
+
+def price_for(backend):
+    for model, price in PRICES.items():
+        if model in backend:
+            return price
+    return None
+
+
+def load(paths):
+    for path in paths:
+        with open(path) as handle:
+            for line in handle:
+                if line.strip():
+                    yield json.loads(line)
+
+
+def pct(numerator, denominator):
+    return "n/a" if not denominator else f"{100 * numerator / denominator:.0f}%"
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write("usage: report.py <graded.jsonl> [...]\n")
+        raise SystemExit(2)
+
+    records = list(load(sys.argv[1:]))
+    by_backend_surface = defaultdict(list)
+    for record in records:
+        by_backend_surface[(record["backend"], record["surface"])].append(record)
+
+    backends = sorted({record["backend"] for record in records})
+
+    print("## Schema compliance, per surface\n")
+    print("Fraction of responses that decoded with nothing done to them -- no fence")
+    print("removed, no prose trimmed, no LaTeX escape repaired, no renormalisation.\n")
+    surfaces = ["steps", "lesson", "formulas"]
+    print("| backend | " + " | ".join(surfaces) + " |")
+    print("|---|" + "---|" * len(surfaces))
+    for backend in backends:
+        cells = []
+        for surface in surfaces:
+            rows = [r for r in by_backend_surface[(backend, surface)] if r["ok"]]
+            clean = sum(1 for r in rows if r.get("isClean"))
+            cells.append(f"{pct(clean, len(rows))} ({clean}/{len(rows)})")
+        print(f"| `{backend}` | " + " | ".join(cells) + " |")
+
+    print("\n## What had to be done, when it was not clean\n")
+    print("| backend | surface | fenced | prose sliced | escapes repaired | renormalised | failed to parse |")
+    print("|---|---|---|---|---|---|---|")
+    for backend in backends:
+        for surface in surfaces:
+            rows = by_backend_surface[(backend, surface)]
+            ok = [r for r in rows if r["ok"]]
+            if not rows:
+                continue
+            print(f"| `{backend}` | {surface} | "
+                  f"{sum(1 for r in ok if r.get('wasFenced'))} | "
+                  f"{sum(1 for r in ok if r.get('wasSliced'))} | "
+                  f"{sum(1 for r in ok if r.get('escapesRepaired'))} | "
+                  f"{sum(1 for r in ok if r.get('wasNormalised'))} | "
+                  f"{sum(1 for r in rows if not r['ok'])} |")
+
+    print("\n## Maths correctness (final answer, symbolic equivalence)\n")
+    print("`undecidable` means the grader could not parse one side and the case")
+    print("needs a human, not that the answer was wrong.\n")
+    print("| backend | correct | wrong | undecidable |")
+    print("|---|---|---|---|")
+    for backend in backends:
+        rows = [r for r in by_backend_surface[(backend, "steps")] if "answerCorrect" in r]
+        correct = sum(1 for r in rows if r["answerCorrect"] is True)
+        wrong = sum(1 for r in rows if r["answerCorrect"] is False)
+        unknown = sum(1 for r in rows if r["answerCorrect"] is None)
+        print(f"| `{backend}` | {pct(correct, len(rows))} ({correct}/{len(rows)}) | {wrong} | {unknown} |")
+
+    print("\n## LaTeX that renders\n")
+    print("Rendered with KaTeX 0.16.21 -- the version the app loads -- and")
+    print("`throwOnError: true`. The app itself renders with `throwOnError: false`,")
+    print("so in production these failures are silent.\n")
+    print("| backend | strings checked | render | fail |")
+    print("|---|---|---|---|")
+    for backend in backends:
+        rows = [r for r in records if r["backend"] == backend]
+        checked = sum(r.get("latexChecked", 0) for r in rows)
+        valid = sum(r.get("latexValid", 0) for r in rows)
+        print(f"| `{backend}` | {checked} | {pct(valid, checked)} ({valid}) | {checked - valid} |")
+
+    print("\n## Latency and cost\n")
+    print("Requests were issued one at a time, so these are per-request latencies")
+    print("rather than what a user sees when four surfaces are fetched at once.")
+    print("Time to first token is **not** measured: the app does not stream, so")
+    print("there is no first token to time.\n")
+    print("| backend | median s | p90 s | in tok | out tok | est. USD |")
+    print("|---|---|---|---|---|---|")
+    for backend in backends:
+        rows = [r for r in records if r["backend"] == backend and r["ok"]]
+        if not rows:
+            continue
+        latencies = sorted(r["latencySeconds"] for r in rows)
+        p90 = latencies[min(len(latencies) - 1, int(0.9 * len(latencies)))]
+        tin = sum(r.get("inputTokens") or 0 for r in rows)
+        tout = sum(r.get("outputTokens") or 0 for r in rows)
+        price = price_for(backend)
+        cost = "n/a (local)" if not price else f"${(tin * price[0] + tout * price[1]) / 1e6:.2f}"
+        print(f"| `{backend}` | {statistics.median(latencies):.2f} | {p90:.2f} | "
+              f"{tin or 'n/a'} | {tout or 'n/a'} | {cost} |")
+
+    print(f"\nRecords: {len(records)}. Problems: "
+          f"{len({r['problemId'] for r in records})}.")
+
+
+if __name__ == "__main__":
+    main()

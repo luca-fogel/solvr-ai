@@ -35,3 +35,7 @@ Secrets.plist
 # Swift package build products
 .build/
 .swiftpm/
+
+# Evaluation runs (raw results are large and machine-specific)
+eval-*.jsonl
+*.graded.jsonl
