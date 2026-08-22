@@ -100,3 +100,44 @@ struct LocalServerURLTests {
         }
     }
 }
+
+/// Fields meant for mathematics that arrive holding a sentence.
+///
+/// The input below is verbatim from the running app: asked for the algebra of a
+/// step, the on-device model returned a sentence, KaTeX rendered it as italics
+/// with the spaces collapsed, and the resulting box was wide enough to push the
+/// page sideways and clip the text beside it.
+@Suite("Prose in a maths field")
+struct ProseDetection {
+
+    @Test("a sentence is recognised as prose")
+    func sentence() {
+        #expect(MathNotation.looksLikeProse(
+            "Let f(x) = 3x^2. Then, the antiderivative of f(x) is F(x) = x^3."))
+        #expect(MathNotation.looksLikeProse(
+            "The derivative of the function with respect to x"))
+    }
+
+    @Test("real working is not")
+    func working() {
+        for maths in [#"\int_{0}^{1} 3x^{2}\,dx = 1"#,
+                      #"\frac{d}{dx}x^{3} = 3x^{2}"#,
+                      "3x = 22 - 7 = 15",
+                      #"\left[x^{3}\right]_{0}^{1}"#,
+                      #"x = \pm\sqrt{4}"#,
+                      #"\tan\left(\frac{\pi}{4}\right) = 1"#] {
+            #expect(!MathNotation.looksLikeProse(maths), "misjudged: \(maths)")
+        }
+    }
+
+    @Test(#"\text{} is exempt, because that is LaTeX's own way to carry words"#)
+    func textMacroIsExempt() {
+        #expect(!MathNotation.looksLikeProse(
+            #"\text{area under the curve} = \int_{0}^{1} f(x)\,dx"#))
+    }
+
+    @Test("short function names and variables survive")
+    func shortNames() {
+        #expect(!MathNotation.looksLikeProse("sin(x) cos(x) = \\frac{1}{2}\\sin(2x)"))
+    }
+}

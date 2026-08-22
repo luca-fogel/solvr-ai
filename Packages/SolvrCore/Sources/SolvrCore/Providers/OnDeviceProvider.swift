@@ -207,8 +207,10 @@ public final class OnDeviceProvider: SolutionProvider {
                      title: step.title,
                      explanation: step.explanation,
                      // Measured, not defensive: this model returns correct maths
-                     // in the wrong notation no matter how the guide is worded.
-                     math: step.math.isEmpty ? nil : MathNotation.toLaTeX(step.math))
+                     // in the wrong notation no matter how the guide is worded --
+                     // and sometimes returns a whole sentence, which renders as
+                     // garbled italics and drags the page width with it.
+                     math: Self.renderableMath(step.math))
         }
     }
 
@@ -229,8 +231,7 @@ public final class OnDeviceProvider: SolutionProvider {
             sections: lesson.sections.map {
                 LessonContent.LessonSection(heading: $0.heading,
                                             content: $0.content,
-                                            formula: $0.formula.isEmpty
-                                                ? nil : MathNotation.toLaTeX($0.formula),
+                                            formula: Self.renderableMath($0.formula),
                                             note: nil,
                                             steps: nil)
             },
@@ -246,7 +247,7 @@ public final class OnDeviceProvider: SolutionProvider {
 
         return generated.formulas.map {
             FormulaItem(name: $0.name,
-                        formula: MathNotation.toLaTeX($0.formula),
+                        formula: Self.renderableMath($0.formula) ?? "",
                         description: $0.description)
         }
     }
@@ -313,6 +314,18 @@ public final class OnDeviceProvider: SolutionProvider {
         let title = (generated ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if title.isEmpty || title.count > 60 { return fallback }
         return title
+    }
+
+    /// A maths field the app can actually render, or nil.
+    ///
+    /// Converts notation where that is possible, and drops the field where the
+    /// model wrote a sentence instead of an expression. Nil is a supported value
+    /// everywhere it is used -- the step shows without a working box -- and an
+    /// absent box reads far better than a wrong one.
+    private static func renderableMath(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !MathNotation.looksLikeProse(trimmed) else { return nil }
+        return MathNotation.toLaTeX(trimmed)
     }
 
     // MARK: - Generation

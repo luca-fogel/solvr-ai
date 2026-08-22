@@ -99,6 +99,16 @@ struct ContentView: View {
                 if OnDeviceSelfTest.isRequested {
                     await OnDeviceSelfTest.run()
                 }
+                // `-SolvrSolve "<problem>"` runs a real solve at launch, through
+                // whichever backend is selected. Demo mode drives the screens from
+                // fixtures, which proves the UI; this proves the whole path --
+                // prompt, model, decode, render -- without anyone typing.
+                if let problem = UserDefaults.standard.string(forKey: "SolvrSolve"),
+                   !problem.isEmpty {
+                    showSplash = false
+                    homeVM.problemText = problem
+                    solve(problem)
+                }
             }
     }
 

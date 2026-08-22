@@ -37,6 +37,32 @@ public enum MathNotation {
         return s.trimmingCharacters(in: .whitespaces)
     }
 
+    /// Whether a field meant to hold mathematics actually holds a sentence.
+    ///
+    /// Observed in the running app: asked for the algebra of a step, the on-device
+    /// model returned "Let f(x) = 3x^2. Then, the antiderivative of f(x) is
+    /// F(x) = x^3." KaTeX renders that as italic maths, collapsing the spaces into
+    /// "Letf(x)...theantiderivativeof" -- and the resulting box is wide enough to
+    /// push the whole page sideways and clip the text beside it.
+    ///
+    /// An empty box is better than a garbled one, so a field that reads as prose is
+    /// dropped rather than rendered. The test is deliberately conservative: real
+    /// working is mostly symbols, so several ordinary words in a row is the signal.
+    /// `\text{...}` is exempt, since that is how LaTeX is *supposed* to carry words.
+    public static func looksLikeProse(_ raw: String) -> Bool {
+        let stripped = raw.replacingOccurrences(
+            of: "\\\\text\\{[^}]*\\}", with: "", options: .regularExpression)
+        let words = stripped
+            .replacingOccurrences(of: "\\\\[a-zA-Z]+", with: " ",
+                                  options: .regularExpression)
+            .split(whereSeparator: { !$0.isLetter })
+            .filter { $0.count >= 3 }
+        // Single-letter variables and short function names survive; a run of real
+        // words does not. Four is loose enough to keep "sqrt of the sum" style
+        // fragments and tight enough to catch a sentence.
+        return words.count >= 4
+    }
+
     /// Whether this looks like text a model wrote instead of LaTeX.
     ///
     /// A single backslash-command is taken as proof the model was writing LaTeX,
