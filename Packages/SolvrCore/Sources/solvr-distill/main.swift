@@ -162,9 +162,17 @@ let provider: any SolutionProvider = {
                 "--teacher openai requires --base-url\n".utf8))
             exit(2)
         }
-        return LocalServerProvider(configuration: .init(
-            baseURL: url, model: options.model, maxTokens: 3000,
-            timeout: 300, bearerToken: key, usesResponseFormat: true))
+        // 4000 rather than 3000: a reasoning model spends part of the budget
+        // thinking before it writes anything, and a lesson truncated mid-JSON is
+        // a wasted request rather than a cheap one.
+        return LocalServerProvider(
+            configuration: .init(baseURL: url, model: options.model, maxTokens: 4000,
+                                 timeout: 300, bearerToken: key,
+                                 usesResponseFormat: true,
+                                 // Omitted: K3 rejects any temperature but 1.
+                                 temperature: nil,
+                                 concurrency: options.concurrency),
+            observe: { m in Task { await ledger.add(input: m.inputTokens, output: m.outputTokens) } })
     default:
         FileHandle.standardError.write(Data(
             "unknown --teacher \(options.teacher)\n".utf8))
@@ -180,6 +188,17 @@ struct Example: Encodable {
     struct Message: Encodable { let role: String; let content: String }
     let messages: [Message]
 }
+
+actor Ledger {
+    private(set) var input = 0
+    private(set) var output = 0
+    func add(input i: Int?, output o: Int?) {
+        input += i ?? 0
+        output += o ?? 0
+    }
+}
+
+let ledger = Ledger()
 
 actor Writer {
     private let handle: FileHandle
@@ -281,9 +300,13 @@ let written = await writer.written
 let failed = await writer.failed
 await writer.close()
 
+let tokensIn = await ledger.input
+let tokensOut = await ledger.output
+
 print("""
     written:  \(written) examples
     failed:   \(failed)
+    tokens:   \(tokensIn) in, \(tokensOut) out\(tokensIn == 0 ? " (not reported by this teacher)" : "")
     elapsed:  \(String(format: "%.0fs", Date().timeIntervalSince(started)))
     output:   \(options.output)
 

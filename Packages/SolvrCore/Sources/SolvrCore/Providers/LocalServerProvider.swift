@@ -41,18 +41,41 @@ public final class LocalServerProvider: SolutionProvider {
         /// constrained and unconstrained against the same model.
         public var usesResponseFormat: Bool
 
+        /// How many requests to have in flight.
+        ///
+        /// One is right for the case this provider exists for: a single GPU
+        /// serialises anyway, so more in flight just means each takes longer, and
+        /// a Mac that might be asleep is not somewhere to lose queue slots. It is
+        /// wrong for a hosted endpoint being used as a distillation teacher,
+        /// where serialising turned four requests into four minutes.
+        public var concurrency: Int
+
+        /// Sampling temperature, or `nil` to omit the field entirely.
+        ///
+        /// Zero is right for `mlx_lm.server`, where it buys reproducible eval
+        /// runs. It is *rejected* by some hosted models -- Kimi K3 returns
+        /// "invalid temperature: only 1 is allowed for this model" and a 400 --
+        /// so this has to be omittable rather than merely settable. Determinism
+        /// is then not available on those endpoints, which is a fact to record in
+        /// the results rather than paper over.
+        public var temperature: Double?
+
         public init(baseURL: URL,
                     model: String = "local",
                     maxTokens: Int = 2048,
                     timeout: TimeInterval = 180,
                     bearerToken: String? = nil,
-                    usesResponseFormat: Bool = false) {
+                    usesResponseFormat: Bool = false,
+                    temperature: Double? = 0,
+                    concurrency: Int = 1) {
             self.baseURL = baseURL
             self.model = model
             self.maxTokens = maxTokens
             self.timeout = timeout
             self.bearerToken = bearerToken
             self.usesResponseFormat = usesResponseFormat
+            self.temperature = temperature
+            self.concurrency = concurrency
         }
     }
 
@@ -62,10 +85,9 @@ public final class LocalServerProvider: SolutionProvider {
     private let session: URLSession
     private let observe: Observer?
 
-    /// One at a time. A single GPU serialises anyway, so four concurrent requests
-    /// only means four requests each taking four times as long -- and on a Mac
-    /// that might be asleep, a queue of four is four slots to lose.
-    private let queue = RequestQueue(maxConcurrent: 1)
+    /// Sized from the configuration: one for a local GPU, more for a hosted
+    /// endpoint. See `Configuration.concurrency`.
+    private let queue: RequestQueue
 
     public init(configuration: Configuration,
                 session: URLSession = .shared,
@@ -73,6 +95,7 @@ public final class LocalServerProvider: SolutionProvider {
         self.configuration = configuration
         self.session = session
         self.observe = observe
+        self.queue = RequestQueue(maxConcurrent: configuration.concurrency)
     }
 
     // MARK: - SolutionProvider
@@ -82,7 +105,7 @@ public final class LocalServerProvider: SolutionProvider {
         return "local/\(configuration.model)/\(mode)"
     }
 
-    public var maxConcurrentRequests: Int { 1 }
+    public var maxConcurrentRequests: Int { configuration.concurrency }
 
     /// A URL is all it takes to be configured. Whether anything is *listening* is
     /// a question only a request can answer, and pretending otherwise would make
@@ -202,7 +225,18 @@ public final class LocalServerProvider: SolutionProvider {
                           schema: JSONSchema? = nil) async throws -> Completion {
         try await queue.withSlot {
             let started = Date()
-            let completion = try await self.perform(messages: messages, schema: schema)
+            let completion: Completion
+            do {
+                completion = try await self.perform(messages: messages, schema: schema)
+            } catch let error as SolverError {
+                // Retry once on a rate limit. Sixteen requests in flight against a
+                // hosted endpoint will occasionally be told to wait, and losing a
+                // whole generated example to that is wasteful when the fix is to
+                // pause. Anything else propagates.
+                guard case .rateLimited(let retryAfter) = error else { throw error }
+                try await Task.sleep(for: .seconds(retryAfter ?? 5))
+                completion = try await self.perform(messages: messages, schema: schema)
+            }
             self.report(surface: surface,
                         latency: Date().timeIntervalSince(started),
                         input: completion.inputTokens,
@@ -226,12 +260,12 @@ public final class LocalServerProvider: SolutionProvider {
             "model": configuration.model,
             "messages": messages,
             "max_tokens": configuration.maxTokens,
-            // Deterministic, so a rerun of the evaluation means something. Some
-            // endpoints pin sampling to their own defaults and ignore this; that
-            // is their prerogative and it is why seeds are recorded per run.
-            "temperature": 0,
             "stream": false,
         ]
+        // Deterministic where the endpoint permits it, absent where it does not.
+        if let temperature = configuration.temperature {
+            body["temperature"] = temperature
+        }
         if configuration.usesResponseFormat, let schema {
             // The OpenAI spelling of the same idea as Anthropic's
             // `output_config.format`.
@@ -270,11 +304,21 @@ public final class LocalServerProvider: SolutionProvider {
             throw SolverError.invalidResponse
         }
         guard http.statusCode == 200 else {
+            // The body, not just the code. An OpenAI-compatible endpoint says
+            // *why* it refused -- an unsupported parameter, a schema it will not
+            // accept -- and discarding that turns a one-line fix into a hunt.
+            let parsedError = (try? JSONSerialization.jsonObject(with: data))
+                .flatMap { $0 as? [String: Any] }
+                .flatMap { $0["error"] as? [String: Any] }
+                .flatMap { $0["message"] as? String }
+            let detail = parsedError
+                ?? String(data: data.prefix(300), encoding: .utf8)
+                ?? "no body"
             switch http.statusCode {
             case 401, 403: throw SolverError.unauthorized
             case 429: throw SolverError.rateLimited(retryAfter: nil)
             case 500...599: throw SolverError.serverError(statusCode: http.statusCode)
-            default: throw SolverError.apiError("Status \(http.statusCode)")
+            default: throw SolverError.apiError("HTTP \(http.statusCode): \(detail)")
             }
         }
 
@@ -282,13 +326,25 @@ public final class LocalServerProvider: SolutionProvider {
         let choice = (root?["choices"] as? [[String: Any]])?.first
         let message = choice?["message"] as? [String: Any]
 
-        // A reasoning model served this way splits its answer in two: `content`
-        // arrives null or empty and the text is under `reasoning_content`. Reading
-        // only `content` gets an empty response and blames the model.
+        // A reasoning model splits its response in two: the chain of thought
+        // under `reasoning_content`, the answer under `content`. Verified against
+        // Kimi K3, which returns both.
         let content = (message?["content"] as? String) ?? ""
         let reasoning = (message?["reasoning_content"] as? String)
             ?? (message?["reasoning"] as? String) ?? ""
-        let text = content.isEmpty ? reasoning : content
+
+        // Falling back to the reasoning is right for a free-text surface, where
+        // the model may put its whole answer there. It is wrong when a schema was
+        // requested: empty content then means the token budget was spent thinking
+        // and the answer never arrived, and handing back the chain of thought as
+        // though it were the answer would turn a clean failure into a confusing
+        // one -- it would parse as nothing and be blamed on the schema.
+        let text: String
+        if content.isEmpty && schema != nil {
+            throw SolverError.contextExceeded
+        } else {
+            text = content.isEmpty ? reasoning : content
+        }
 
         guard !text.isEmpty else { throw SolverError.emptyResponse }
 
