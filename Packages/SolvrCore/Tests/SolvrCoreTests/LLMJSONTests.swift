@@ -349,3 +349,62 @@ struct ComplianceInstrument {
         #expect(fenced?.compliance.isClean == false)
     }
 }
+
+/// Three shapes for one request.
+///
+/// Asked for a list, a model returns the bare array it was shown in the prompt,
+/// the wrapper it was given in the schema, or a wrapper it named itself after
+/// whatever it was asked for. Kimi K3 produced the first and the third from the
+/// same request shape, with `strict: true` set, which is what motivated this.
+@Suite("Lists in whatever shape they arrive")
+struct ListShapes {
+
+    private let element = #"{"step":1,"title":"a","explanation":"b","math":"\frac{1}{2}"}"#
+
+    @Test("a bare array decodes and counts as clean")
+    func bareArray() {
+        let out = LLMJSON.decodeList(Step.self, from: "[\(element)]")
+        #expect(out?.value.count == 1)
+        #expect(out?.compliance.wasSliced == false)
+    }
+
+    @Test("an array under a self-named key is found")
+    func selfNamedWrapper() {
+        let out = LLMJSON.decodeList(Step.self, from: #"{"steps":[\#(element)]}"#)
+        #expect(out?.value.count == 1)
+        #expect(out?.value.first?.math == #"\frac{1}{2}"#)
+    }
+
+    @Test("unwrapping is recorded, not hidden")
+    func unwrappingIsRecorded() {
+        // Same class of thing as trimming prose: the response was not the shape
+        // asked for, and a compliance figure that hid it would flatter itself.
+        let out = LLMJSON.decodeList(Step.self, from: #"{"items":[\#(element)]}"#)
+        #expect(out?.compliance.wasSliced == true)
+        #expect(out?.compliance.isClean == false)
+    }
+
+    @Test("a fenced, prose-wrapped, self-named array still gets through")
+    func allThreeProblemsAtOnce() {
+        let raw = """
+        Sure, here you go:
+        ```json
+        {"steps": [\(element)]}
+        ```
+        """
+        let out = LLMJSON.decodeList(Step.self, from: raw)
+        #expect(out?.value.count == 1)
+        #expect(out?.compliance.wasFenced == true)
+    }
+
+    @Test("an object with two array properties is refused rather than guessed at")
+    func ambiguityIsNotGuessed() {
+        let raw = #"{"steps":[\#(element)],"other":[]}"#
+        #expect(LLMJSON.unwrapSingleArrayProperty(raw) == nil)
+    }
+
+    @Test("a single property that is not an array is not unwrapped")
+    func nonArrayPropertyIsLeftAlone() {
+        #expect(LLMJSON.unwrapSingleArrayProperty(#"{"steps":"nope"}"#) == nil)
+    }
+}

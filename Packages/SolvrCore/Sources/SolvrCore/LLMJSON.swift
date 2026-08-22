@@ -354,6 +354,60 @@ public enum LLMJSON {
         return nil
     }
 
+    // MARK: - Arrays that arrived wearing a hat
+
+    /// Pull the array out of a single-property object.
+    ///
+    /// Asked for a list, a model returns one of three shapes: the bare array it
+    /// was shown in the prompt, the wrapper it was given in the schema
+    /// (`{"items": [...]}`), or a wrapper it named itself after the thing it was
+    /// asked for (`{"steps": [...]}`, `{"formulas": [...]}`). The third is the one
+    /// that used to fail, because nothing was looking for it -- and it is not a
+    /// malformed response, it is a reasonable reading of an ambiguous request.
+    ///
+    /// Observed rather than imagined: Kimi K3, given a JSON-Schema wrapper with
+    /// `strict: true` *and* a prompt showing a bare array, sometimes honoured one
+    /// and sometimes the other.
+    ///
+    /// Returns `nil` unless the document really is an object with exactly one
+    /// property holding an array -- guessing between two candidate arrays would
+    /// be worse than failing.
+    public static func unwrapSingleArrayProperty(_ raw: String) -> String? {
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object.count == 1,
+              let array = object.values.first as? [Any],
+              let reserialised = try? JSONSerialization.data(withJSONObject: array),
+              let string = String(data: reserialised, encoding: .utf8)
+        else { return nil }
+        return string
+    }
+
+    /// Decode a list, accepting all three shapes a model might use for one.
+    ///
+    /// `wasSliced` is recorded when unwrapping was needed, because it is the same
+    /// class of thing as trimming prose: the response was not the shape asked
+    /// for, and a compliance figure that hid that would be flattering itself.
+    public static func decodeList<Element: Decodable>(
+        _ element: Element.Type, from raw: String
+    ) -> Decoded<[Element]>? {
+        if let direct = decode([Element].self, from: raw) {
+            return direct
+        }
+        let cleaned = sliceJSONBody(stripCodeFences(raw), shape: .object)
+        guard let inner = unwrapSingleArrayProperty(cleaned),
+              let unwrapped = decode([Element].self, from: inner)
+        else { return nil }
+        // The inner decode only ever saw the extracted array, so anything wrong
+        // with the document *around* it -- a fence, prose -- is invisible from
+        // there and has to be carried across explicitly. Losing a signal because
+        // of where it was measured is exactly the bug this record replaced.
+        var compliance = unwrapped.compliance
+        compliance.wasSliced = true
+        compliance.wasFenced = compliance.wasFenced || raw.contains("```")
+        return Decoded(value: unwrapped.value, compliance: compliance)
+    }
+
     // MARK: - HTML
 
     /// Escape text for interpolation into the HTML that renders maths in a web

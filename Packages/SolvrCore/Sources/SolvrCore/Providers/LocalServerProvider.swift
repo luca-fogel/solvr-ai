@@ -153,7 +153,14 @@ public final class LocalServerProvider: SolutionProvider {
             lastCompliance.set(wrapped.compliance)
             return wrapped.value.items
         }
-        return try decode([Element].self, from: raw, surface: surface)
+        // Handles the bare array and the self-named wrapper alike.
+        guard let decoded = LLMJSON.decodeList(Element.self, from: raw) else {
+            report(surface: surface, latency: 0, input: nil, output: nil,
+                   compliance: nil, failure: "could not parse response")
+            throw SolverError.decodingFailed(context: "\(surface): could not parse response")
+        }
+        lastCompliance.set(decoded.compliance)
+        return decoded.value
     }
 
     private struct ItemsWrapper<Element: Decodable>: Decodable {

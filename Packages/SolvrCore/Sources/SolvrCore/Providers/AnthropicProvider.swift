@@ -262,7 +262,7 @@ public final class AnthropicProvider: SolutionProvider {
             return wrapped.value.items
         }
 
-        if let decoded = LLMJSON.decode([Element].self, from: raw) {
+        if let decoded = LLMJSON.decodeList(Element.self, from: raw) {
             report(surface: surface, metrics: metrics,
                    compliance: decoded.compliance, failure: nil)
             return decoded.value
