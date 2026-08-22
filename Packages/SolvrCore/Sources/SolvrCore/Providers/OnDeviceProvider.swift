@@ -105,14 +105,18 @@ public final class OnDeviceProvider: SolutionProvider {
         var title: String
         @Guide(description: "One or two plain sentences of reasoning. No LaTeX, no symbols: write 'x squared', not '$x^2$'.")
         var explanation: String
-        @Guide(description: "The algebra for this step as LaTeX with no dollar delimiters, like \\frac{x}{2}. Empty string if this step is purely conceptual.")
+        @Guide(description: """
+            The algebra for this step written in LaTeX, with no dollar delimiters. \
+            Use LaTeX commands, never plain text: \\frac{a}{b} not a/b, x^{3} not \
+            x^3, \\int_{0}^{1} not the word integral, \\sqrt{x} not sqrt(x), \
+            \\left[ x^{3} \\right]_{0}^{1} for evaluation bars. Write only the \
+            mathematics, no words. Empty string if this step is purely conceptual.
+            """)
         var math: String
     }
 
     @Generable
     struct GeneratedLesson {
-        @Guide(description: "The name of the concept being taught, not the problem.")
-        var title: String
         @Guide(description: "Two words: a broad area and a sub-area, like 'Calculus - Integration'.")
         var topic: String
         @Guide(description: "One or two sentences on when and why this concept matters.")
@@ -122,6 +126,16 @@ public final class OnDeviceProvider: SolutionProvider {
         var sections: [GeneratedSection]
         @Guide(description: "One sentence summarising the key idea.")
         var keyTakeaway: String
+        // Declared last on purpose. Guided generation fills fields in declaration
+        // order, and asked for a title first the model simply echoed the student's
+        // problem back. Asked after it has written the lesson, it has something to
+        // name.
+        @Guide(description: """
+            The name of the mathematical concept taught above, as it would appear as \
+            a textbook chapter heading -- for example 'The Fundamental Theorem of \
+            Calculus' or 'Integration by Parts'. Never restate the student's problem.
+            """)
+        var title: String
     }
 
     @Generable
@@ -130,7 +144,11 @@ public final class OnDeviceProvider: SolutionProvider {
         var heading: String
         @Guide(description: "Two to four sentences of explanation. Inline maths goes in $...$.")
         var content: String
-        @Guide(description: "The key formula as pure LaTeX with no dollar delimiters. Empty string if the section has no formula.")
+        @Guide(description: """
+            The key formula in LaTeX with no dollar delimiters, using commands \
+            rather than plain text: \\frac{a}{b}, x^{n}, \\int_{a}^{b}. Empty \
+            string if the section has no formula.
+            """)
         var formula: String
     }
 
@@ -144,7 +162,10 @@ public final class OnDeviceProvider: SolutionProvider {
     struct GeneratedFormula {
         @Guide(description: "A short human-readable name.")
         var name: String
-        @Guide(description: "The formula as pure LaTeX with no dollar delimiters.")
+        @Guide(description: """
+            The formula in LaTeX with no dollar delimiters, using commands rather \
+            than plain text: \\frac{a}{b}, x^{n}, \\int_{a}^{b}, \\sqrt{x}.
+            """)
         var formula: String
         @Guide(description: "One or two plain sentences on when to use it.")
         var description: String
@@ -176,7 +197,8 @@ public final class OnDeviceProvider: SolutionProvider {
             surface: "steps",
             instructions: """
             You are a patient maths tutor. Solve the problem the student gives you, \
-            showing every algebraic step. Be exact and do not skip working.
+            showing every algebraic step. Be exact and do not skip working. All \
+            mathematics must be written in LaTeX notation, never as plain text.
             """,
             prompt: "Solve this problem step by step: \(text)")
 
@@ -184,7 +206,9 @@ public final class OnDeviceProvider: SolutionProvider {
             StepItem(step: index + 1,
                      title: step.title,
                      explanation: step.explanation,
-                     math: step.math.isEmpty ? nil : step.math)
+                     // Measured, not defensive: this model returns correct maths
+                     // in the wrong notation no matter how the guide is worded.
+                     math: step.math.isEmpty ? nil : MathNotation.toLaTeX(step.math))
         }
     }
 
@@ -205,7 +229,8 @@ public final class OnDeviceProvider: SolutionProvider {
             sections: lesson.sections.map {
                 LessonContent.LessonSection(heading: $0.heading,
                                             content: $0.content,
-                                            formula: $0.formula.isEmpty ? nil : $0.formula,
+                                            formula: $0.formula.isEmpty
+                                                ? nil : MathNotation.toLaTeX($0.formula),
                                             note: nil,
                                             steps: nil)
             },
@@ -220,7 +245,9 @@ public final class OnDeviceProvider: SolutionProvider {
             prompt: "List the key formulas relevant to: \(text)")
 
         return generated.formulas.map {
-            FormulaItem(name: $0.name, formula: $0.formula, description: $0.description)
+            FormulaItem(name: $0.name,
+                        formula: MathNotation.toLaTeX($0.formula),
+                        description: $0.description)
         }
     }
 

@@ -96,6 +96,9 @@ struct ContentView: View {
                 if !DemoMode.isEnabled, ProviderFactory.selectedBackend == .appleOnDevice {
                     ProviderFactory.onDevice.prewarm()
                 }
+                if OnDeviceSelfTest.isRequested {
+                    await OnDeviceSelfTest.run()
+                }
             }
     }
 
