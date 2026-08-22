@@ -5,7 +5,8 @@ Photograph a maths problem. Get the working, and the lesson behind it.
 A native **iOS and Mac Catalyst** app in Swift and SwiftUI. Point the camera at a
 problem — or type it — and it returns step-by-step working with the reason for
 each step, the concept the question was testing, the formulas involved, and a
-chat to keep asking. On-device OCR runs before anything is sent anywhere.
+chat to keep asking. Behind one interface it can be backed by more than one
+model, and the comparison between them is measured rather than asserted.
 
 ![solvr.ai on iPhone](docs/images/hero.png)
 
@@ -22,7 +23,8 @@ over — the working, the concept, the formulas, and answers to "but why".
 ## What it does
 
 ```
-photo ──► Vision OCR (on device) ──► problem text
+photo ──────────► a backend that can see reads it directly;
+                  one that cannot gets it via on-device text recognition
                                           │
 typed problem ────────────────────────────┤
                                           ▼
@@ -94,7 +96,7 @@ resolve — the only package is local, in `Packages/`.
 ```
 solvr.ai/
   Models/          Codable response types, plus the SwiftData Problem
-  Services/        ClaudeAPIManager, OCRService, CameraManager, KeychainManager
+  Services/        ProviderFactory, OCRService, CameraManager, KeychainManager
   ViewModels/      one per screen; none of them know how a request was made
   Views/           Home · Scanner · Results (Steps/Lesson/Formulas/Videos/Chat) · History · Settings
   Utilities/       Theme, HTMLBuilder (KaTeX), PlatformHelper
@@ -146,8 +148,20 @@ xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' b
 - **No accounts, no sync, no telemetry.** History is local to the device via
   SwiftData. Nothing is uploaded except the problem itself, to the API, when you
   ask for a solution.
-- **OCR is Apple's Vision, not a maths-aware recogniser.** It reads printed
-  problems well and handwriting unevenly, and it is why the crop overlay exists.
+- **A photograph is harder than typed text, and how much harder depends on the
+  backend.** A backend with native vision reads the image itself. One without --
+  Apple's on-device model has no image input at all -- gets Apple's Vision text
+  recognition instead, which reads printed problems well, handwriting unevenly,
+  and a fraction as two numbers with a line between them. That downgrade is
+  recorded per backend rather than glossed over, which is why a wrapped provider
+  reports itself as `<backend>+ocr`.
+
+## Documentation
+
+- [docs/backends.md](docs/backends.md) — the provider interface, why it lives in
+  the package, and where the JSON repair ladder actually earns its keep
+- [docs/evaluation.md](docs/evaluation.md) — how the backends are measured, what
+  is deliberately not measured, and how to run it
 
 ## See also
 
