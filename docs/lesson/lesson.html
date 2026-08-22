@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Teaching a small model to speak your schema</title>
+<link rel="stylesheet" href="../../solvr.ai/Resources/KaTeX/katex.min.css">
+<script defer src="../../solvr.ai/Resources/KaTeX/katex.min.js"></script>
+<script defer src="../../solvr.ai/Resources/KaTeX/auto-render.min.js"
+        onload="renderMathInElement(document.body,{delimiters:[
+          {left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+          throwOnError:false});"></script>
+<style>
+  @page { size: A4; margin: 20mm 18mm 18mm; }
+  :root{
+    --ink:#16161a; --soft:#5b5b66; --faint:#9a9aa6;
+    --rule:#e3e3ea; --accent:#4F46E5; --accent-soft:#EEF0FF;
+    --warn:#B45309; --warn-soft:#FEF6E7; --good:#047857; --good-soft:#ECFDF5;
+    --mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; color:var(--ink); background:#fff;
+    font:11.2pt/1.62 "Charter","Iowan Old Style","Palatino",Georgia,serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:158mm;margin:0 auto;padding:14mm 0 0 13mm}
+
+  /* ---- masthead ---- */
+  .kicker{font:600 8.5pt/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+          color:var(--accent);margin:0 0 10px}
+  h1{font-size:26pt;line-height:1.1;letter-spacing:-.02em;margin:0 0 8px;font-weight:600}
+  .standfirst{font-size:12.4pt;line-height:1.5;color:var(--soft);margin:0 0 14px;
+              max-width:150mm}
+  .byline{font:9pt/1.4 var(--mono);color:var(--faint);border-top:1px solid var(--rule);
+          padding-top:9px;display:flex;gap:16px;flex-wrap:wrap}
+
+  /* ---- structure ---- */
+  h2{font-size:14.5pt;letter-spacing:-.01em;margin:28px 0 3px;font-weight:600;
+     page-break-after:avoid;padding-left:0;position:relative}
+  h2 .num{font:600 8.6pt/1 var(--mono);color:var(--accent);
+          position:absolute;left:-13mm;top:.42em}
+  h3{font-size:10.5pt;margin:16px 0 3px;font-weight:600;page-break-after:avoid}
+  p{margin:0 0 9px}
+  ul{margin:0 0 9px;padding-left:19px} li{margin:0 0 5px}
+  strong{font-weight:600}
+  em.term{font-style:normal;font-weight:600;color:var(--accent)}
+
+  /* ---- devices ---- */
+  .lede{font-size:11.8pt;color:var(--soft)}
+  .box{border-radius:7px;padding:11px 14px;margin:12px 0;font-size:10.2pt;
+       page-break-inside:avoid}
+  .box p:last-child{margin-bottom:0}
+  .box .tag{font:600 7.6pt/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;
+            display:block;margin-bottom:5px}
+  .happened{background:var(--accent-soft)} .happened .tag{color:var(--accent)}
+  .trap{background:var(--warn-soft)} .trap .tag{color:var(--warn)}
+  .takeaway{background:var(--good-soft)} .takeaway .tag{color:var(--good)}
+
+  pre{background:#16161a;color:#e8e8ef;border-radius:7px;padding:11px 13px;
+      font:9.1pt/1.5 var(--mono);overflow:hidden;margin:11px 0;
+      page-break-inside:avoid;white-space:pre-wrap}
+  code{font:.92em var(--mono);background:#f3f3f7;padding:1px 4px;border-radius:3px}
+  pre code{background:none;padding:0;font-size:1em}
+
+  table{width:100%;border-collapse:collapse;font-size:10pt;margin:11px 0;
+        page-break-inside:avoid}
+  th{text-align:left;font:600 8.2pt/1.3 var(--mono);letter-spacing:.07em;
+     text-transform:uppercase;color:var(--faint);padding:0 8px 5px 0;
+     border-bottom:1px solid var(--rule)}
+  td{padding:5px 8px 5px 0;border-bottom:1px solid var(--rule);
+     font-variant-numeric:tabular-nums;vertical-align:top}
+  td.n{font-family:var(--mono);font-size:9.3pt}
+
+  figure{margin:14px 0;page-break-inside:avoid}
+  figcaption{font-size:8.8pt;color:var(--faint);margin-top:6px;line-height:1.45}
+  .katex{font-size:1.03em}
+  .eq{margin:12px 0;text-align:center}
+
+  footer{margin-top:26px;border-top:1px solid var(--rule);padding-top:9px;
+         font:8.6pt/1.5 var(--mono);color:var(--faint)}
+  .pb{page-break-before:always}
+  @media print{ body{font-size:10.6pt} .page{padding-top:0} }
+</style></head>
+<body><div class="page">
+
+<p class="kicker">Applied machine learning · case study</p>
+<h1>Teaching a small model to speak your schema</h1>
+<p class="standfirst">What a real distillation-and-fine-tuning run teaches about
+constrained decoding, data hygiene, GPU scheduling, and why your measurements
+are the first thing you should distrust.</p>
+<p class="byline"><span>Solvr.ai · 22 August 2026</span><span>Qwen3-4B ← Kimi K3</span>
+<span>1,103 examples · $22 · 0.182% of weights trained</span></p>
+
+<h2><span class="num">01</span>The problem is a shape, not intelligence</h2>
+<p class="lede">An app needs JSON in an exact form. The model needs to produce it
+every time, not usually.</p>
+<p>Solvr turns a maths problem into four things: worked steps, a lesson, formulas,
+and video suggestions. Each is a typed structure the app decodes. A model that
+solves the maths correctly but returns it in the wrong shape is, from the app's
+point of view, broken.</p>
+<p>That reframes the goal. We are not chasing a smarter model. We want a
+<em class="term">small</em> model that is reliable about <em class="term">our</em>
+output format — and the two are almost unrelated problems.</p>
+
+<div class="box happened"><span class="tag">What happened here</span>
+<p>Apple's on-device model, asked explicitly and repeatedly for LaTeX, returned
+<code>∫[0,1] 3x^2 dx</code> instead of
+<code>\int_{0}^{1} 3x^{2}\,dx</code>. The mathematics was correct. Firmer prompt
+wording changed the flavour of the wrong answer, not its correctness. Its
+weakness was presentation, and prompting was not a strong enough lever.</p></div>
+
+<h2><span class="num">02</span>Two ways to get a shape</h2>
+<p>You can ask for a shape and repair what comes back, or you can make the wrong
+shape impossible to emit. These are not equivalent.</p>
+
+<h3>Repair after the fact</h3>
+<p>Ask for JSON in the prompt, then clean up: strip markdown fences, trim prose,
+fix escapes. This works, and it hides a nasty class of bug.</p>
+
+<div class="box trap"><span class="tag">The trap</span>
+<p><code>"\frac{d}{dx}"</code> is <strong>valid JSON</strong> — <code>\f</code> is a
+form feed. So a strict parser <em>succeeds</em> and hands back
+<code>&lt;FF&gt;rac{d}{dx}</code>. Every fraction in the app was silently
+corrupted, with no error raised anywhere. A response that parses is not the same
+as a response that parsed correctly.</p></div>
+
+<h3>Constrain the decoder</h3>
+<p><em class="term">Constrained decoding</em> restricts the tokens the model may
+emit so that output must satisfy a schema. The wrong shape is not merely
+discouraged; it is unreachable.</p>
+<pre><code>"response_format": {"type": "json_schema",
+  "json_schema": {"name":"steps","strict":true,"schema":{…}}}</code></pre>
+<p>The important consequence is where failure goes. Repair can succeed and be
+wrong. Constrained generation either gives you a valid structure or throws.
+It does not remove failure — it removes <em>silent</em> failure.</p>
+
+<table>
+  <thead><tr><th>Backend</th><th>Decoding</th><th>Repair layer</th></tr></thead>
+  <tbody>
+    <tr><td>Hosted API, prose JSON</td><td>unconstrained</td><td class="n">load-bearing</td></tr>
+    <tr><td>Hosted API + json_schema</td><td>constrained</td><td class="n">unreachable</td></tr>
+    <tr><td>Apple on-device, guided</td><td>constrained</td><td class="n">impossible to need</td></tr>
+    <tr><td>Self-hosted <code>mlx_lm.server</code></td><td>unconstrained</td><td class="n">load-bearing</td></tr>
+  </tbody>
+</table>
+<div class="box takeaway"><span class="tag">Generalise</span>
+<p>Schema compliance is a property of the <strong>decoding mechanism</strong>, not
+of model quality. The repair layer is not the price of using a hosted model — it
+is the price of asking <em>any</em> model for structure in prose. Note the last
+row: self-hosting is where you <em>lose</em> the guarantee.</p></div>
+
+<h2 class="pb"><span class="num">03</span>Distillation: a big model teaches a small one</h2>
+<p><em class="term">Knowledge distillation</em> trains a small
+<em class="term">student</em> on outputs produced by a large
+<em class="term">teacher</em>. Here: Kimi K3 answered 1,200 prompts, and those
+answers became the training targets for a 4-billion-parameter Qwen3.</p>
+<p>Two design decisions did most of the work.</p>
+<ul>
+  <li><strong>The prompt in each training example is byte-identical to what the
+  app sends.</strong> Train on a paraphrase and you have fine-tuned for a prompt
+  that never occurs in production.</li>
+  <li><strong>Each target was produced by encoding the app's own decoded
+  type.</strong> So every target is, by construction, something the app can
+  parse. You cannot accidentally teach the model to emit something you cannot
+  read.</li>
+</ul>
+<p>The student inherits the teacher — every weakness in step decomposition or
+notation is copied. It is the one decision that later engineering cannot fix,
+so it is worth measuring rather than assuming. Here: 3,788 of 3,789 LaTeX
+strings rendered, and five hand-checked solutions were mathematically correct.</p>
+<div class="box takeaway"><span class="tag">On honesty</span>
+<p>Distillation from a commercial model is a legitimate, widely used method. It is
+also something people quietly do and loudly deny. State it: the write-up should
+name the teacher, the sample size, and the cost.</p></div>
+
+<h2><span class="num">04</span>The dataset is where the bugs live</h2>
+<p>Three separate mistakes in building 1,103 examples. None were in the model
+code; all three would have degraded the result silently.</p>
+
+<h3>Garbage targets</h3>
+<p>A template emitted <code>Factor completely: x² + 7x + 23</code>. That does not
+factor over the integers. The teacher will produce <em>something</em>, and the
+student will learn to invent factorisations. Fixed by generating quadratics from
+their roots, so a clean answer is guaranteed by construction.</p>
+
+<h3>Hidden imbalance</h3>
+<p>Balancing the problem set by <em>topic</em> looked right and was not: 56 of 60
+algebra problems came from a single template. Technically on-topic, useless for
+teaching variety. Balancing across <em>templates</em> took the set from 2 distinct
+shapes to 44.</p>
+
+<h3>Leakage across the split</h3>
+<p>Each problem yields four examples, one per surface. Splitting randomly over
+<em>examples</em> puts the steps for a problem in training and its lesson in test
+— so the held-out score measures recall, not generalisation. The split must be
+by <strong>problem</strong>.</p>
+<div class="box trap"><span class="tag">The trap</span>
+<p>The splitter <em>claimed</em> to group by problem: it hashed the prompt. But
+each surface has a different prompt, so every group held exactly one example and
+the split was random after all. The bug was visible only in a number nobody had
+thought to print — <code>examples per problem</code>. Once printed:
+<code>{2: 8, 3: 82, 4: 210}</code>, and 60 problems held out whole.</p></div>
+
+<h2><span class="num">05</span>LoRA: train 0.182% of the weights</h2>
+<p>Full fine-tuning updates every parameter. <em class="term">LoRA</em> — low-rank
+adaptation — freezes the model and learns a small additive correction to chosen
+weight matrices:</p>
+<div class="eq">$$W' = W + BA, \qquad B \in \mathbb{R}^{d\times r},\;
+A \in \mathbb{R}^{r\times k},\; r \ll \min(d,k)$$</div>
+<p>Because $r$ is tiny, $BA$ has far fewer parameters than $W$ while still
+shifting behaviour. Applied to the last 16 of 36 blocks, that was
+<strong>7.34M trainable parameters out of 4.02B — 0.182%</strong>. The adapter is
+a few megabytes; the base model is untouched and shared.</p>
+<p>This suits the goal exactly. We are not adding knowledge, we are adjusting
+output form, and form lives near the output.</p>
+
+<figure>
+<svg viewBox="0 0 520 150" role="img" aria-label="Training and validation loss">
+  <line x1="34" y1="126" x2="512" y2="126" stroke="#e3e3ea"/>
+  <line x1="34" y1="8" x2="34" y2="126" stroke="#e3e3ea"/>
+  <text x="2" y="14" font-size="9" fill="#9a9aa6" font-family="monospace">1.48</text>
+  <text x="2" y="126" font-size="9" fill="#9a9aa6" font-family="monospace">0.68</text>
+  <polyline fill="none" stroke="#4F46E5" stroke-width="2.2"
+    points="34,8 130,42 226,105 322,98 418,104 512,116"/>
+  <polyline fill="none" stroke="#B45309" stroke-width="2.2" stroke-dasharray="5 4"
+    points="34,8 418,126"/>
+  <circle cx="512" cy="116" r="3.2" fill="#4F46E5"/>
+  <text x="300" y="146" font-size="9" fill="#9a9aa6" font-family="monospace">iteration 1 → 125</text>
+</svg>
+<figcaption><strong>Solid:</strong> training loss, 1.476 → 0.712.
+<strong>Dashed:</strong> validation loss, 1.476 → 0.685. Validation falling with
+training — rather than flattening or rising — is the signal that the model is
+learning the format instead of memorising the examples. 875 training examples,
+114 validation, 113 test, split by problem.</figcaption>
+</figure>
+
+<h2 class="pb"><span class="num">06</span>The systems layer bites back</h2>
+<p>Training died three times with:</p>
+<pre><code>[METAL] Command buffer execution failed:
+Impacting Interactivity (kIOGPUCommandBufferCallbackErrorImpactingInteractivity)</code></pre>
+<p>A GPU driver batches work into a <em class="term">command buffer</em>. macOS
+ends a buffer that monopolises the GPU for too long, to keep the interface
+responsive. This is not an out-of-memory error, and treating it as one sends you
+the wrong way: peak usage was 12.6 GB of 64.</p>
+<p>It was diagnosed by <em>where</em> it died, not by guessing:</p>
+<table>
+  <thead><tr><th>Attempt</th><th>Died in</th><th>Reading</th></tr></thead>
+  <tbody>
+    <tr><td class="n">batch 4</td><td>first validation (223 s)</td><td>one enormous buffer</td></tr>
+    <tr><td class="n">batch 2</td><td>a training step</td><td>validation fixed; steps still too big</td></tr>
+    <tr><td class="n">batch 1 + accum 4</td><td>iteration 125, intermittently</td><td>rare, not systematic</td></tr>
+  </tbody>
+</table>
+<p><em class="term">Gradient accumulation</em> is the fix that costs nothing.
+Instead of one backward pass over 4 examples, run 4 passes of 1 and sum the
+gradients before stepping the optimiser. The gradient is
+$\nabla L = \frac{1}{4}\sum_{i=1}^{4}\nabla L_i$ either way — mathematically
+identical, but each command buffer holds a quarter as much work.</p>
+<div class="box takeaway"><span class="tag">Generalise</span>
+<p>When a failure is intermittent and environmental, stop hunting for the
+configuration that never triggers it and make triggering it cheap. Checkpoint
+every 25 iterations, resume from the last one, count progress cumulatively. A
+crash then costs two minutes instead of a run.</p></div>
+
+<h2><span class="num">07</span>Distrust your instruments first</h2>
+<p>The most expensive errors in this project were in the things doing the
+measuring, not the things being measured.</p>
+
+<h3>A metric that flattered the wrong answer</h3>
+<p>Schema compliance was to be measured by a field recording whether a response
+needed repair. It compared the string <em>after</em> fence-stripping against the
+repaired one — so a response wrapped in a markdown fence recorded as clean. Prose
+trimming happened at the call site, outside the measurement entirely.</p>
+<p>Both blind spots hid exactly what a weak model does most. A 4B that fenced
+every single response would have scored identically to a frontier model emitting
+bare JSON, and the project's headline comparison would have been wrong in the
+direction that looks good.</p>
+
+<h3>An estimate built on the easy end</h3>
+<p>Cost was projected from a six-example probe. But the sampler took the
+<em>first</em> six problems, and the problem set was ordered by topic — so all six
+were simple algebra. Integrals and series reason far more, and reasoning tokens
+are billed as output.</p>
+<table>
+  <thead><tr><th></th><th>Estimated</th><th>Actual</th></tr></thead>
+  <tbody>
+    <tr><td>Output tokens</td><td class="n">909,000</td><td class="n">1,505,133</td></tr>
+    <tr><td>Cost</td><td class="n">$15.06</td><td class="n">$22–24</td></tr>
+  </tbody>
+</table>
+<div class="box takeaway"><span class="tag">Generalise</span>
+<p>Sampling the head of an ordered list is not sampling. And an estimate that is
+wrong in a comfortable direction is worse than no estimate, because it gets
+believed. Prefer the ledger; label the guess as a guess.</p></div>
+
+<h2><span class="num">08</span>What is actually known</h2>
+<p>At the time of writing the run is mid-flight, so here is the honest ledger.</p>
+<table>
+  <thead><tr><th>Claim</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Teacher produces renderable, correct targets</td><td>Measured — 3,788/3,789 LaTeX render; 5/5 hand-checked correct</td></tr>
+    <tr><td>The student is learning</td><td>Measured — validation loss 1.476 → 0.685</td></tr>
+    <tr><td>The student beats anything on format</td><td><strong>Not yet measured.</strong> Needs the eval harness</td></tr>
+    <tr><td>The student loses on reasoning</td><td><strong>Expected, unmeasured.</strong> A 4B should</td></tr>
+    <tr><td>Cost per answer, local vs hosted</td><td>Unmeasured — energy needs the Mac on battery</td></tr>
+  </tbody>
+</table>
+<p>A fine-tuned 4B that beats a frontier API on schema compliance and loses on
+reasoning is a real, publishable result — and considerably more credible than a
+claimed win. The point of building the harness before believing the model is that
+the harness is what makes the claim worth anything.</p>
+
+<footer>
+Solvr.ai · figures from the run of 22 August 2026 · Qwen3-4B-4bit, LoRA rank on
+the last 16 of 36 blocks, distilled from Kimi K3 · typeset with the same vendored
+KaTeX the app ships, so this document renders with no network
+</footer>
+</div></body></html>
