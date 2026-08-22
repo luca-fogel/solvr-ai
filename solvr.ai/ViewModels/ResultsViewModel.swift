@@ -88,8 +88,13 @@ final class ResultsViewModel {
         currentInput = input
         resetState()
 
-        Task { await fetchLesson(input) }
+        // Steps first, deliberately. Against a hosted API all four run at once
+        // and the order is cosmetic. The on-device model serves one request at a
+        // time -- `GenerationError.concurrentRequests` is real -- so these queue,
+        // and steps is the tab that opens by default. Asking for it first is the
+        // difference between the screen filling in and the screen waiting.
         Task { await fetchSteps(input) }
+        Task { await fetchLesson(input) }
         Task { await fetchFormulas(input) }
         Task { await fetchVideos(input) }
     }

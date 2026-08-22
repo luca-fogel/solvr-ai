@@ -89,7 +89,14 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
-        .task { await openDemoScreenIfRequested() }
+        .task {
+                await openDemoScreenIfRequested()
+                // Loading the on-device model is the expensive part of the first
+                // solve. Warming it while the user is still typing hides that.
+                if !DemoMode.isEnabled, ProviderFactory.selectedBackend == .appleOnDevice {
+                    ProviderFactory.onDevice.prewarm()
+                }
+            }
     }
 
     /// Jump straight to one screen, populated with demo data, when launched with

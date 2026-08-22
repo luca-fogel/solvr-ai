@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import SolvrCore
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -10,13 +11,44 @@ struct SettingsView: View {
     @State private var saveSuccess = false
     @State private var saveFailed = false
     @State private var showClearConfirm = false
-    @AppStorage("selectedModel") private var selectedModel: String = "claude-sonnet-4-6"
+    @AppStorage(ProviderFactory.backendKey) private var backend: String = ProviderFactory.Backend.anthropic.rawValue
+    @AppStorage("selectedModel") private var selectedModel: String = "claude-opus-5"
     @AppStorage("maxTokens") private var maxTokens: Int = 2048
     @AppStorage(DemoMode.defaultsKey) private var demoMode: Bool = false
+
+    private var selectedBackend: ProviderFactory.Backend {
+        ProviderFactory.Backend(rawValue: backend) ?? .anthropic
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                Section("Where answers come from") {
+                    Picker("Backend", selection: $backend) {
+                        ForEach(ProviderFactory.Backend.allCases) { option in
+                            Text(option.displayName).tag(option.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(selectedBackend.detail)
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+
+                    // The on-device model can be unavailable for three reasons,
+                    // and all three are the user's to fix rather than ours. Saying
+                    // nothing until a solve fails would be the unhelpful option.
+                    if selectedBackend == .appleOnDevice,
+                       let reason = ProviderFactory.onDeviceUnavailableReason {
+                        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text(reason)
+                                .font(Theme.Fonts.caption)
+                        }
+                    }
+                }
+
                 // API Key
                 Section("API Configuration") {
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -93,12 +125,20 @@ struct SettingsView: View {
                 }
 
                 Section("Model") {
-                    Picker("Model", selection: $selectedModel) {
-                        Text("Claude Opus 4.6").tag("claude-opus-4-6")
-                        Text("Claude Sonnet 4.6").tag("claude-sonnet-4-6")
-                        Text("Claude Haiku 4.5").tag("claude-haiku-4-5-20251001")
+                    if selectedBackend == .appleOnDevice {
+                        // There is no model to choose: the OS supplies one.
+                        Text("Apple's on-device model. Nothing to configure — the "
+                             + "system provides it and there is no alternative to pick.")
+                            .font(Theme.Fonts.caption)
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                    } else {
+                        Picker("Model", selection: $selectedModel) {
+                            Text("Claude Opus 5").tag("claude-opus-5")
+                            Text("Claude Sonnet 5").tag("claude-sonnet-5")
+                            Text("Claude Haiku 4.5").tag("claude-haiku-4-5")
+                        }
+                        .tint(Theme.Colors.accent)
                     }
-                    .tint(Theme.Colors.accent)
 
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         HStack {
@@ -193,9 +233,9 @@ struct SettingsView: View {
                     }
 
                     HStack {
-                        Text("Powered by")
+                        Text("Answers from")
                         Spacer()
-                        Text("Claude API")
+                        Text(demoMode ? "Bundled fixtures" : selectedBackend.displayName)
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
                 }

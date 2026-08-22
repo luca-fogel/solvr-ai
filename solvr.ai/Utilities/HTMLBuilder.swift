@@ -169,10 +169,17 @@ enum HTMLBuilder {
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=yes">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
-                onload="renderMathInElement(document.body, {
+        \(KaTeXAssets.styleTag)
+        \(KaTeXAssets.scriptTag)
+        <script>
+            // Inlined rather than linked, so this runs with no network at all --
+            // which an app that can answer on device has to be able to do.
+            // `throwOnError: false` stays: one malformed formula should degrade to
+            // red text, not blank the page. It does mean invalid LaTeX fails
+            // silently here, which is why the evaluation harness renders the same
+            // strings with `throwOnError: true` and counts what breaks.
+            document.addEventListener("DOMContentLoaded", function () {
+                renderMathInElement(document.body, {
                     delimiters: [
                         {left: '$$', right: '$$', display: true},
                         {left: '\\\\[', right: '\\\\]', display: true},
@@ -180,7 +187,10 @@ enum HTMLBuilder {
                         {left: '\\\\(', right: '\\\\)', display: false}
                     ],
                     throwOnError: false
-                }); scaleMath();"></script>
+                });
+                scaleMath();
+            });
+        </script>
         <style>
             :root {
                 --accent: #5856D6;
