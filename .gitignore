@@ -45,3 +45,4 @@ tools/finetune/adapters/
 
 # Generated status page (regenerate with tools/status/status.sh --html)
 docs/run-status.html
+tools/finetune/adapters-525/*.safetensors
