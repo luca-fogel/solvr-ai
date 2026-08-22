@@ -1,4 +1,5 @@
 import SwiftUI
+import SolvrCore
 
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel

@@ -18,7 +18,7 @@ final class ScannerViewModel {
     var selectedProblem: DetectedProblem?
     var errorMessage: String?
 
-    private let api = ClaudeAPIManager.shared
+    private let api = AnthropicProvider()
 
     // MARK: - Capture
 

@@ -26,7 +26,10 @@ final class ResultsViewModel {
     // Source image from camera scanner
     var sourceImage: UIImage?
 
-    private let api = ClaudeAPIManager.shared
+    /// The last thing we were asked, so a retry can re-ask it. A photograph is
+    /// kept as the bytes that were sent rather than the `UIImage`, so a retry is
+    /// byte-identical to the original request.
+    private var currentInput: ProblemInput = .text("")
 
     // Owned here, not read off the provider. Four fetches run concurrently, and
     // while there was exactly one backend it was harmless for them to share five
@@ -42,42 +45,53 @@ final class ResultsViewModel {
         isLoadingLesson || isLoadingSteps || isLoadingFormulas || isLoadingVideos
     }
 
-    // MARK: - Solve (text)
+    // MARK: - Solve
 
     func solveAll(problem: String) {
         currentProblem = problem
         problemTitle = problem
-        resetState()
-
-        Task { await fetchLesson(problem) }
-        Task { await fetchSteps(problem) }
-        Task { await fetchFormulas(problem) }
-        Task { await fetchVideos(problem) }
+        solve(.text(problem))
     }
-
-    // MARK: - Solve (image)
 
     func solveFromImage(_ image: UIImage) {
         sourceImage = image
         currentProblem = "[Scanned Image]"
         problemTitle = ""
-        resetState()
+        guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
+            resetState()
+            let failure = SolverError.invalidResponse
+            lessonError = failure
+            stepsError = failure
+            formulasError = failure
+            videosError = failure
+            return
+        }
+        solve(.image(jpeg))
 
         Task {
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { await self.fetchLessonFromImage(image) }
-                group.addTask { await self.fetchStepsFromImage(image) }
-                group.addTask { await self.fetchFormulasFromImage(image) }
-                group.addTask { await self.fetchVideosFromImage(image) }
-                group.addTask {
-                    let title = await ClaudeAPIManager.shared.generateProblemTitle(from: image)
-                    await MainActor.run {
-                        self.problemTitle = title
-                        self.currentProblem = title
-                    }
-                }
+            let title = await ProviderFactory.current().title(for: .image(jpeg))
+            await MainActor.run {
+                self.problemTitle = title
+                self.currentProblem = title
             }
         }
+    }
+
+    /// One path for both, which is the point of `ProblemInput`.
+    ///
+    /// The two used to be separate: four methods for typed problems and four
+    /// near-identical ones for photographs, differing only in which API call they
+    /// made. Whether a backend can read a photograph is now the provider's
+    /// business -- `ProviderFactory` wraps the ones that cannot -- so this layer
+    /// no longer knows or cares.
+    private func solve(_ input: ProblemInput) {
+        currentInput = input
+        resetState()
+
+        Task { await fetchLesson(input) }
+        Task { await fetchSteps(input) }
+        Task { await fetchFormulas(input) }
+        Task { await fetchVideos(input) }
     }
 
     private func resetState() {
@@ -93,13 +107,13 @@ final class ResultsViewModel {
         selectedTab = .steps
     }
 
-    // MARK: - Text fetchers
+    // MARK: - Fetchers
 
-    private func fetchLesson(_ problem: String) async {
+    private func fetchLesson(_ input: ProblemInput) async {
         isLoadingLesson = true
         defer { isLoadingLesson = false }
         do {
-            let result = try await api.fetchLesson(for: problem)
+            let result = try await ProviderFactory.current().lesson(for: input)
             await MainActor.run { lesson = result }
         } catch {
             await MainActor.run {
@@ -108,11 +122,11 @@ final class ResultsViewModel {
         }
     }
 
-    private func fetchSteps(_ problem: String) async {
+    private func fetchSteps(_ input: ProblemInput) async {
         isLoadingSteps = true
         defer { isLoadingSteps = false }
         do {
-            let result = try await api.fetchSteps(for: problem)
+            let result = try await ProviderFactory.current().steps(for: input)
             await MainActor.run { steps = result }
         } catch {
             await MainActor.run {
@@ -121,11 +135,11 @@ final class ResultsViewModel {
         }
     }
 
-    private func fetchFormulas(_ problem: String) async {
+    private func fetchFormulas(_ input: ProblemInput) async {
         isLoadingFormulas = true
         defer { isLoadingFormulas = false }
         do {
-            let result = try await api.fetchFormulas(for: problem)
+            let result = try await ProviderFactory.current().formulas(for: input)
             await MainActor.run { formulas = result }
         } catch {
             await MainActor.run {
@@ -134,65 +148,11 @@ final class ResultsViewModel {
         }
     }
 
-    private func fetchVideos(_ problem: String) async {
+    private func fetchVideos(_ input: ProblemInput) async {
         isLoadingVideos = true
         defer { isLoadingVideos = false }
         do {
-            let result = try await api.fetchVideos(for: problem)
-            await MainActor.run { videos = result }
-        } catch {
-            await MainActor.run {
-                videosError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
-    }
-
-    // MARK: - Image fetchers
-
-    private func fetchLessonFromImage(_ image: UIImage) async {
-        isLoadingLesson = true
-        defer { isLoadingLesson = false }
-        do {
-            let result = try await api.fetchLessonFromImage(image)
-            await MainActor.run { lesson = result }
-        } catch {
-            await MainActor.run {
-                lessonError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
-    }
-
-    private func fetchStepsFromImage(_ image: UIImage) async {
-        isLoadingSteps = true
-        defer { isLoadingSteps = false }
-        do {
-            let result = try await api.fetchStepsFromImage(image)
-            await MainActor.run { steps = result }
-        } catch {
-            await MainActor.run {
-                stepsError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
-    }
-
-    private func fetchFormulasFromImage(_ image: UIImage) async {
-        isLoadingFormulas = true
-        defer { isLoadingFormulas = false }
-        do {
-            let result = try await api.fetchFormulasFromImage(image)
-            await MainActor.run { formulas = result }
-        } catch {
-            await MainActor.run {
-                formulasError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
-    }
-
-    private func fetchVideosFromImage(_ image: UIImage) async {
-        isLoadingVideos = true
-        defer { isLoadingVideos = false }
-        do {
-            let result = try await api.fetchVideosFromImage(image)
+            let result = try await ProviderFactory.current().videos(for: input)
             await MainActor.run { videos = result }
         } catch {
             await MainActor.run {
@@ -250,41 +210,25 @@ final class ResultsViewModel {
     func retryLesson() {
         lessonError = nil
         lesson = nil
-        if sourceImage != nil {
-            Task { await fetchLessonFromImage(sourceImage!) }
-        } else {
-            Task { await fetchLesson(currentProblem) }
-        }
+        Task { await fetchLesson(currentInput) }
     }
 
     func retrySteps() {
         stepsError = nil
         steps = nil
-        if sourceImage != nil {
-            Task { await fetchStepsFromImage(sourceImage!) }
-        } else {
-            Task { await fetchSteps(currentProblem) }
-        }
+        Task { await fetchSteps(currentInput) }
     }
 
     func retryFormulas() {
         formulasError = nil
         formulas = nil
-        if sourceImage != nil {
-            Task { await fetchFormulasFromImage(sourceImage!) }
-        } else {
-            Task { await fetchFormulas(currentProblem) }
-        }
+        Task { await fetchFormulas(currentInput) }
     }
 
     func retryVideos() {
         videosError = nil
         videos = nil
-        if sourceImage != nil {
-            Task { await fetchVideosFromImage(sourceImage!) }
-        } else {
-            Task { await fetchVideos(currentProblem) }
-        }
+        Task { await fetchVideos(currentInput) }
     }
 
     // MARK: - Save to History

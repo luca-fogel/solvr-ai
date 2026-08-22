@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SolvrCore
 
 /// Populating screens that are empty on a fresh install, so a screenshot of
 /// "History" shows history rather than an empty-state placeholder.

@@ -2,22 +2,36 @@ import Foundation
 import UIKit
 import SolvrCore
 
-@Observable
-final class ClaudeAPIManager {
-
-    static let shared = ClaudeAPIManager()
+/// Solvr against the Anthropic Messages API.
+///
+/// This is the quality ceiling every other backend is measured against, and it
+/// is the only one that reads a photograph natively rather than through text
+/// recognition.
+///
+/// It used to be `ClaudeAPIManager`, a singleton that also owned the app's
+/// loading flags and short-circuited to demo fixtures at the top of all twelve
+/// of its methods. Both of those now live outside it: loading state belongs to
+/// the screen showing it, and the demo path is a provider of its own. What is
+/// left is what is genuinely Anthropic-specific -- the prompts, the wire format
+/// and the decode ladder.
+final class AnthropicProvider: SolutionProvider {
 
     private let baseURL = URL(string: "https://api.anthropic.com/v1/messages")!
 
+    /// Normalises whatever is in `UserDefaults` onto a model ID that exists.
+    ///
+    /// The old mapping sent Haiku to `claude-haiku-4-5-20251001`; current IDs
+    /// carry no date suffix, so that string is not a model. Note the `default`
+    /// branch passes unrecognised values straight through -- a previous version
+    /// rewrote them to Sonnet, which would silently discard a local model name
+    /// stored under the same key.
     private var selectedModel: String {
         let stored = UserDefaults.standard.string(forKey: "selectedModel") ?? ""
         switch stored {
-        case "claude-sonnet-4-20250514":
-            return "claude-sonnet-4-6"
-        case "claude-haiku-4-20250414":
-            return "claude-haiku-4-5-20251001"
-        case "":
-            return "claude-sonnet-4-6"
+        case "", "claude-sonnet-4-20250514":
+            return "claude-opus-5"
+        case "claude-haiku-4-20250414", "claude-haiku-4-5-20251001":
+            return "claude-haiku-4-5"
         default:
             return stored
         }
@@ -32,20 +46,40 @@ final class ClaudeAPIManager {
         KeychainManager.retrieve()
     }
 
+    /// Four at once suits a hosted API's rate limits. It is a property of this
+    /// backend rather than a constant of the app, because an on-device session
+    /// throws if you ask it two things at a time.
     private let requestQueue = RequestQueue(maxConcurrent: 4)
 
-    private init() {}
+    // MARK: - SolutionProvider
 
-    // MARK: - Lesson (JSON)
+    var identifier: String { "anthropic/\(selectedModel)" }
+    var maxConcurrentRequests: Int { 4 }
+    var isConfigured: Bool { KeychainManager.hasAPIKey }
 
-    func fetchLesson(for problem: String) async throws -> LessonContent {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
+    /// The one backend that genuinely sees the picture.
+    var acceptsImageInput: Bool { true }
+
+    // MARK: - Prompts
+    //
+    // The prompts live here rather than in the app because they are a property
+    // of the backend: a 4B needs shorter, more constrained instructions than
+    // Opus, and a backend with guided generation needs no schema in the prompt
+    // at all. Each is written once and told how to refer to the problem, which
+    // is the only thing that differed between the old text and image variants.
+
+    private func problemClause(_ input: ProblemInput) -> String {
+        switch input {
+        case .text(let problem):
+            return "The student submitted this problem: '\(problem)'."
+        case .image:
+            return "Look at the math problem in this image."
         }
+    }
 
-        let prompt = """
-        You are a world-class math tutor. The student submitted this problem: '\(problem)'.
+    private func lessonPrompt(_ input: ProblemInput) -> String {
+        """
+        You are a world-class math tutor. \(problemClause(input))
 
         Teach the underlying math concept (do NOT solve the exact problem).
 
@@ -74,75 +108,11 @@ final class ClaudeAPIManager {
         - "steps" is optional (null if not a worked example section)
         - Return ONLY the JSON, no markdown fences, no explanation
         """
-
-        let response = try await sendMessage(prompt)
-        return try decodeLessonJSON(from: response)
     }
 
-    func fetchLessonFromImage(_ image: UIImage) async throws -> LessonContent {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
-        }
-
-        let prompt = """
-        You are a world-class math tutor. Look at the math problem in this image.
-
-        Teach the underlying math concept (do NOT solve the exact problem).
-
-        Return ONLY valid JSON with this structure:
-        {
-            "title": "Concept Name",
-            "topic": "CATEGORY \u{2022} SUBCATEGORY",
-            "introduction": "1-2 sentences explaining when/why this concept matters.",
-            "sections": [
-                {
-                    "heading": "Section Title",
-                    "content": "Explanation text. Use $...$ for inline LaTeX math.",
-                    "formula": "LaTeX expression for key formula (optional, null if none)",
-                    "note": "Brief clarification (optional, null if none)",
-                    "steps": ["Step 1 text", "Step 2 text"]
-                }
-            ],
-            "keyTakeaway": "1-2 sentence summary of the key idea."
-        }
-
-        Rules:
-        - Use LaTeX for ALL math expressions inside $...$ delimiters
-        - "content" is plain text with optional $inline math$
-        - "formula" is pure LaTeX (no $ delimiters, no text)
-        - Include 3-5 sections covering: the concept, intuition/analogy, and a worked example
-        - "steps" is optional (null if not a worked example section)
-        - Return ONLY the JSON, no markdown fences, no explanation
+    private func formulasPrompt(_ input: ProblemInput) -> String {
         """
-
-        let response = try await sendImageMessage(image, prompt: prompt)
-        return try decodeLessonJSON(from: response)
-    }
-
-    private func decodeLessonJSON(from raw: String) throws -> LessonContent {
-        let body = LLMJSON.sliceJSONBody(raw, shape: .object)
-        guard let decoded = LLMJSON.decode(LessonContent.self, from: body) else {
-            throw SolverError.decodingFailed(context: "lesson: could not parse response")
-        }
-        if decoded.provenance != .strict {
-            // Worth logging: a lesson that needed rescuing is a prompt problem,
-            // and the prompt is the thing to fix.
-            print("[ClaudeAPI] lesson parsed via \(decoded.provenance.rawValue)")
-        }
-        return decoded.value
-    }
-
-    // MARK: - Formulas (JSON)
-
-    func fetchFormulas(for problem: String) async throws -> [FormulaItem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
-        }
-
-        let prompt = """
-        List 3-6 key mathematical formulas relevant to this problem: '\(problem)'.
+        \(problemClause(input)) List 3-6 key mathematical formulas relevant to it.
 
         Return ONLY a valid JSON array with this structure:
         [{"name": "Formula Name", "formula": "\\\\frac{a}{b}", "description": "When and how to use this formula"}]
@@ -153,44 +123,11 @@ final class ClaudeAPIManager {
         - "name" is a short human-readable label
         - Return ONLY the JSON array, no other text, no markdown fences
         """
-
-        let response = try await sendMessage(prompt)
-        return try decodeJSON([FormulaItem].self, from: response, context: "formulas")
     }
 
-    func fetchFormulasFromImage(_ image: UIImage) async throws -> [FormulaItem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
-        }
-
-        let prompt = """
-        Look at the math problem in this image. List 3-6 key mathematical formulas relevant to it.
-
-        Return ONLY a valid JSON array with this structure:
-        [{"name": "Formula Name", "formula": "\\\\frac{a}{b}", "description": "When and how to use this formula"}]
-
-        Rules:
-        - "formula" must be valid LaTeX. CRITICAL: In JSON, all backslashes must be doubled — write \\\\frac{}{} not \\frac{}{}, \\\\sqrt{} not \\sqrt{}, \\\\pi not \\pi
-        - "description" is plain text, 1-2 sentences
-        - "name" is a short human-readable label
-        - Return ONLY the JSON array, no other text, no markdown fences
+    private func stepsPrompt(_ input: ProblemInput) -> String {
         """
-
-        let response = try await sendImageMessage(image, prompt: prompt)
-        return try decodeJSON([FormulaItem].self, from: response, context: "formulas")
-    }
-
-    // MARK: - Step-by-Step (JSON)
-
-    func fetchSteps(for problem: String) async throws -> [StepItem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
-        }
-
-        let prompt = """
-        Solve this math problem step by step: '\(problem)'.
+        \(problemClause(input)) Solve it step by step.
 
         Return ONLY a valid JSON array with this structure:
         [{"step": 1, "title": "Short action title", "explanation": "Plain text explanation of what we're doing", "math": "\\\\frac{x}{y}"}]
@@ -205,68 +142,11 @@ final class ClaudeAPIManager {
         - Show every algebraic step clearly
         - Return ONLY the JSON array, no other text, no markdown fences
         """
-
-        let response = try await sendMessage(prompt)
-        return try decodeJSON([StepItem].self, from: response, context: "steps")
     }
 
-    func fetchStepsFromImage(_ image: UIImage) async throws -> [StepItem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
-        }
-
-        let prompt = """
-        Look at the math problem in this image. Solve it step by step.
-
-        Return ONLY a valid JSON array with this structure:
-        [{"step": 1, "title": "Short action title", "explanation": "Plain text explanation", "math": "\\\\frac{x}{y}"}]
-
-        Rules:
-        - "step" is the step number (integer, starting at 1)
-        - "title" is a short action phrase like "Identify the equation" or "Factor the expression"
-        - "explanation" is 1-2 sentences in plain text describing the reasoning. Do NOT use LaTeX in explanations — use words like "x squared" or "the integral of f(x)".
-        - "math" is the LaTeX expression showing the algebraic work. CRITICAL: In JSON, all backslashes must be doubled. Write \\\\frac not \\frac, \\\\sqrt not \\sqrt, \\\\int not \\int, \\\\pi not \\pi. Every LaTeX backslash must be \\\\ in the JSON string.
-        - "math" can be null if the step is purely conceptual
-        - The LAST step should contain the final answer
-        - Show every algebraic step clearly
-        - Return ONLY the JSON array, no other text, no markdown fences
+    private func videosPrompt(_ input: ProblemInput) -> String {
         """
-
-        let response = try await sendImageMessage(image, prompt: prompt)
-        return try decodeJSON([StepItem].self, from: response, context: "steps")
-    }
-
-    // MARK: - Videos
-
-    func fetchVideos(for problem: String) async throws -> [VideoItem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
-        }
-
-        let prompt = """
-        Suggest 4-5 specific YouTube educational videos for learning about this math topic: '\(problem)'. \
-        Include videos from channels like Khan Academy, 3Blue1Brown, Professor Leonard, \
-        Organic Chemistry Tutor, PatrickJMT. For each, provide: title, channel name, a specific YouTube search query, \
-        and if you know the exact YouTube video ID include it as "videoId". \
-        Make search queries very specific, including the exact math concept and operation. \
-        Format as JSON array: [{"title": "...", "channel": "...", "searchQuery": "...", "videoId": "...", "thumbnailURL": ""}]. \
-        Return ONLY valid JSON.
-        """
-
-        let response = try await sendMessage(prompt)
-        return try decodeJSON([VideoItem].self, from: response, context: "videos")
-    }
-
-    func fetchVideosFromImage(_ image: UIImage) async throws -> [VideoItem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
-        }
-
-        let prompt = """
-        Look at the math problem in this image. \
+        \(problemClause(input)) \
         Suggest 4-5 specific YouTube educational videos for learning about this math topic. \
         Include videos from channels like Khan Academy, 3Blue1Brown, Professor Leonard, \
         Organic Chemistry Tutor, PatrickJMT. For each, provide: title, channel name, a specific YouTube search query, \
@@ -275,43 +155,90 @@ final class ClaudeAPIManager {
         Format as JSON array: [{"title": "...", "channel": "...", "searchQuery": "...", "videoId": "...", "thumbnailURL": ""}]. \
         Return ONLY valid JSON.
         """
+    }
 
-        let response = try await sendImageMessage(image, prompt: prompt)
+    // MARK: - The four surfaces
+
+    func lesson(for problem: ProblemInput) async throws -> LessonContent {
+        let response = try await respond(to: lessonPrompt(problem), about: problem)
+        let body = LLMJSON.sliceJSONBody(response, shape: .object)
+        guard let decoded = LLMJSON.decode(LessonContent.self, from: body) else {
+            throw SolverError.decodingFailed(context: "lesson: could not parse response")
+        }
+        if decoded.provenance != .strict {
+            print("[anthropic] lesson parsed via \(decoded.provenance.rawValue)")
+        }
+        return decoded.value
+    }
+
+    func steps(for problem: ProblemInput) async throws -> [StepItem] {
+        let response = try await respond(to: stepsPrompt(problem), about: problem)
+        return try decodeJSON([StepItem].self, from: response, context: "steps")
+    }
+
+    func formulas(for problem: ProblemInput) async throws -> [FormulaItem] {
+        let response = try await respond(to: formulasPrompt(problem), about: problem)
+        return try decodeJSON([FormulaItem].self, from: response, context: "formulas")
+    }
+
+    func videos(for problem: ProblemInput) async throws -> [VideoItem] {
+        let response = try await respond(to: videosPrompt(problem), about: problem)
         return try decodeJSON([VideoItem].self, from: response, context: "videos")
     }
 
     // MARK: - Chat
 
-    func sendChatMessage(_ message: String, problemContext: String, history: [ChatMessage]) async throws -> String {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return DemoFixtures.chatReply
-        }
-
+    func chatReply(to message: String,
+                   about problem: String,
+                   history: [ChatMessage]) async throws -> String {
         let systemPrompt = """
-        You are a friendly, patient math tutor. The student is working on this problem: '\(problemContext)'. \
+        You are a friendly, patient math tutor. The student is working on this problem: '\(problem)'. \
         They've already seen the lesson and step-by-step solution. \
         Answer their follow-up questions clearly and encouragingly. Use simple language. \
         If they're confused, try explaining differently with an analogy.
         """
 
-        var messages: [ClaudeMessage] = []
-        for msg in history {
-            messages.append(ClaudeMessage(role: msg.role.rawValue, content: msg.content))
+        var messages: [ClaudeMessage] = history.map {
+            ClaudeMessage(role: $0.role.rawValue, content: $0.content)
         }
         messages.append(ClaudeMessage(role: "user", content: message))
-
-        let response = try await sendMessages(messages, system: systemPrompt)
-        return response
+        return try await sendMessages(messages, system: systemPrompt)
     }
 
-    // MARK: - Problem Detection (Claude Vision)
+    // MARK: - Title
+
+    func title(for problem: ProblemInput) async -> String {
+        let fallback: String
+        switch problem {
+        case .text(let text): fallback = String(text.prefix(40))
+        case .image: fallback = "Scanned Problem"
+        }
+
+        let prompt = """
+        \(problemClause(problem))
+
+        Respond with ONLY a 3-5 word title summarizing what the problem is about. Examples: "Surface Area Integral", "Curl of Vector Field", "Quadratic Factoring", "Taylor Series Expansion", "Double Integral Polar".
+
+        Respond with ONLY the short title, nothing else. No quotes, no period, no explanation.
+        """
+
+        guard let response = try? await respond(to: prompt, about: problem) else {
+            return fallback
+        }
+        let title = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty && title.count <= 60 { return title }
+        let words = title.split(separator: " ").prefix(5).joined(separator: " ")
+        return words.isEmpty ? fallback : words
+    }
+
+    // MARK: - Problem detection
+    //
+    // Not part of `SolutionProvider`: nothing in the shipping UI reaches it --
+    // `HomeView` inlines its own camera flow and `ScannerViewModel` is
+    // unreferenced -- so putting it in the protocol would oblige every future
+    // backend to implement a feature the app does not use.
 
     func detectProblems(in image: UIImage) async throws -> [DetectedProblem] {
-        if DemoMode.isEnabled {
-            await DemoMode.pause()
-            return try DemoMode.decode([DetectedProblem].self, from: DemoFixtures.detectedProblems, label: "detection")
-        }
         let prompt = """
         You are analyzing a photo taken of a computer screen displaying a math document (PDF, webpage, or document viewer).
 
@@ -348,55 +275,26 @@ final class ClaudeAPIManager {
 
         let response = try await sendImageMessage(image, prompt: prompt)
         let extracted = response.extractJSONArray()
-        let data = Data(extracted.utf8)
         do {
-            return try JSONDecoder().decode([DetectedProblem].self, from: data)
+            return try JSONDecoder().decode([DetectedProblem].self, from: Data(extracted.utf8))
         } catch {
             throw SolverError.decodingFailed(context: "problem detection")
         }
     }
 
-    // MARK: - Problem Title from Image
+    // MARK: - Dispatch
 
-    func generateProblemTitle(from image: UIImage) async -> String {
-        if DemoMode.isEnabled { return DemoFixtures.title }
-        do {
-            let prompt = """
-            Look at this math problem image. Respond with ONLY a 3-5 word title summarizing what the problem is about. Examples: "Surface Area Integral", "Curl of Vector Field", "Quadratic Factoring", "Taylor Series Expansion", "Double Integral Polar".
-
-            Respond with ONLY the short title, nothing else. No quotes, no period, no explanation.
-            """
-            let response = try await sendImageMessage(image, prompt: prompt)
-            let title = response.trimmingCharacters(in: .whitespacesAndNewlines)
-            if title.count <= 60 && !title.isEmpty {
-                return title
+    /// One place that decides whether a prompt travels as text or alongside an
+    /// image, so every surface above stays free of that branch.
+    private func respond(to prompt: String, about problem: ProblemInput) async throws -> String {
+        switch problem {
+        case .text:
+            return try await sendMessages([ClaudeMessage(role: "user", content: prompt)])
+        case .image(let data):
+            guard let image = UIImage(data: data) else {
+                throw SolverError.invalidResponse
             }
-            let words = title.split(separator: " ").prefix(5).joined(separator: " ")
-            return words.isEmpty ? "Scanned Problem" : words
-        } catch {
-            return "Scanned Problem"
-        }
-    }
-
-    func generateProblemTitle(from text: String) async -> String {
-        if DemoMode.isEnabled { return DemoFixtures.title }
-        do {
-            let prompt = """
-            Here is a math problem: '\(text)'
-
-            Respond with ONLY a 3-5 word title summarizing what this problem is about. Examples: "Surface Area Integral", "Curl of Vector Field", "Quadratic Factoring".
-
-            Respond with ONLY the short title, nothing else.
-            """
-            let response = try await sendMessage(prompt)
-            let title = response.trimmingCharacters(in: .whitespacesAndNewlines)
-            if title.count <= 60 && !title.isEmpty {
-                return title
-            }
-            let words = title.split(separator: " ").prefix(5).joined(separator: " ")
-            return words.isEmpty ? String(text.prefix(40)) : words
-        } catch {
-            return String(text.prefix(40))
+            return try await sendImageMessage(image, prompt: prompt)
         }
     }
 
@@ -562,11 +460,6 @@ final class ClaudeAPIManager {
 
     // MARK: - Core Networking
 
-    private func sendMessage(_ content: String, system: String? = nil) async throws -> String {
-        let messages = [ClaudeMessage(role: "user", content: content)]
-        return try await sendMessages(messages, system: system)
-    }
-
     private func sendMessages(_ messages: [ClaudeMessage], system: String? = nil) async throws -> String {
         // One release, on every path, including cancellation. The previous
         // version released at five separate call sites; a slot missed at any of
@@ -651,5 +544,4 @@ final class ClaudeAPIManager {
 
         return text
     }
-
 }

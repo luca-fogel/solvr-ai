@@ -5,20 +5,22 @@ import Foundation
 /// Strict on `title`, `channel` and `searchQuery` -- without a query there is
 /// nothing to link to -- and lenient on `videoId` and `thumbnailURL`, which
 /// models supply inconsistently and which `youtubeURL` can work around.
-struct VideoItem: Codable, Identifiable {
-    var id: String { title + channel }
-    let title: String
-    let channel: String
-    let searchQuery: String
-    let videoId: String?
-    let thumbnailURL: String?
+public struct VideoItem: Codable, Identifiable, Sendable {
+    /// Derived from all three required fields. `title + channel` collided
+    /// whenever a model suggested the same video twice under one channel.
+    public var id: String { "\(title)|\(channel)|\(searchQuery)" }
+    public let title: String
+    public let channel: String
+    public let searchQuery: String
+    public let videoId: String?
+    public let thumbnailURL: String?
 
     /// The wire format arrives through `init(from:)` below. This exists because a
     /// provider that generates typed values directly -- guided generation on the
     /// on-device model, or a fixture -- had no way to construct a `VideoItem` at
     /// all: the only initialiser was a decoder.
-    init(title: String, channel: String, searchQuery: String,
-         videoId: String? = nil, thumbnailURL: String? = nil) {
+    public init(title: String, channel: String, searchQuery: String,
+                videoId: String? = nil, thumbnailURL: String? = nil) {
         self.title = title
         self.channel = channel
         self.searchQuery = searchQuery
@@ -26,7 +28,7 @@ struct VideoItem: Codable, Identifiable {
         self.thumbnailURL = thumbnailURL
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decode(String.self, forKey: .title)
         channel = try container.decode(String.self, forKey: .channel)
@@ -35,7 +37,7 @@ struct VideoItem: Codable, Identifiable {
         thumbnailURL = try container.decodeIfPresent(String.self, forKey: .thumbnailURL)
     }
 
-    var youtubeURL: URL? {
+    public var youtubeURL: URL? {
         if let videoId, !videoId.isEmpty {
             return URL(string: "https://www.youtube.com/watch?v=\(videoId)")
         }
@@ -43,7 +45,7 @@ struct VideoItem: Codable, Identifiable {
         return URL(string: "https://www.youtube.com/results?search_query=\(query)")
     }
 
-    var thumbnailImageURL: URL? {
+    public var thumbnailImageURL: URL? {
         if let videoId, !videoId.isEmpty {
             return URL(string: "https://img.youtube.com/vi/\(videoId)/mqdefault.jpg")
         }

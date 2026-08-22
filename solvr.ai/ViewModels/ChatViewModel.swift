@@ -10,7 +10,6 @@ final class ChatViewModel {
     var errorMessage: SolverError?
     
     private var problemContext: String = ""
-    private let api = ClaudeAPIManager.shared
     
     let suggestedPrompts = [
         "Explain step 3 more",
@@ -37,9 +36,9 @@ final class ChatViewModel {
         }
         
         do {
-            let response = try await api.sendChatMessage(
-                content,
-                problemContext: problemContext,
+            let response = try await ProviderFactory.current().chatReply(
+                to: content,
+                about: problemContext,
                 history: messages.filter { $0.role != .user || $0.id != userMessage.id }
             )
             
