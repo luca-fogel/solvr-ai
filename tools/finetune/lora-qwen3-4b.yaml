@@ -12,7 +12,10 @@ optimizer: adamw
 
 # The last 16 blocks of 36. Formatting and structure live near the output; going
 # deeper costs memory and time for a target that does not need it.
-num_layers: 16
+# The last 8 of 36, halved from 16. Output format lives near the output, so 8
+# blocks remains ample for the task -- and it halves the work in the backward
+# pass, which is what the Metal interactivity deadline actually measures.
+num_layers: 8
 
 # One sequence per forward pass, four accumulated before each optimiser step.
 #
@@ -45,8 +48,11 @@ steps_per_eval: 100
 # Five, not twenty-five. One validation pass over a hundred examples took 223
 # seconds and was the command buffer macOS objected to. Twenty examples is enough
 # to see the curve move, and it is the curve that matters, not its precision.
-val_batches: 5
-save_every: 100
+val_batches: 2
+# Every 25 rather than 100. The Metal crash is intermittent -- it hit at iteration
+# 1 twice and then at 125 -- so the question is not how to prevent it but how
+# little to lose to it. At 25 a crash costs a couple of minutes.
+save_every: 25
 adapter_path: "tools/finetune/adapters"
 
 # Off. It trades compute for memory, and memory was never the constraint -- the

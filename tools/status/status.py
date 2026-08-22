@@ -126,10 +126,20 @@ def training_state():
     if not TRAIN_LOG.exists():
         return {"started": False, "running": process_alive("mlx_lm.lora")}
     text = TRAIN_LOG.read_text(errors="replace")
-    train = [(int(i), float(l)) for i, l in
-             re.findall(r"Iter (\d+): Train loss ([\d.]+)", text)]
-    val = [(int(i), float(l)) for i, l in
-           re.findall(r"Iter (\d+): Val loss ([\d.]+)", text)]
+    # Offset each attempt's iteration numbers by what came before it. mlx_lm
+    # restarts counting at 1 on every resume, so plotting the raw numbers drew
+    # several overlapping series as one zigzag and the progress bar froze at
+    # whatever the longest attempt reached.
+    attempts = re.split(r"=== attempt \d+:[^=]*===", text)
+    train, val, offset = [], [], 0
+    for body in (attempts[1:] or [text]):
+        t_here = [(int(i), float(l)) for i, l in
+                  re.findall(r"Iter (\d+): Train loss ([\d.]+)", body)]
+        v_here = [(int(i), float(l)) for i, l in
+                  re.findall(r"Iter (\d+): Val loss ([\d.]+)", body)]
+        train += [(i + offset, l) for i, l in t_here]
+        val += [(i + offset, l) for i, l in v_here]
+        offset += max([i for i, _ in t_here] or [0])
     peak = re.findall(r"Peak mem ([\d.]+) GB", text)
     speed = re.findall(r"Tokens/sec ([\d.]+)", text)
     trained = re.findall(r"Trained Tokens (\d+)", text)
@@ -139,16 +149,23 @@ def training_state():
     # How it ended matters as much as where it got to. A crashed run that still
     # shows its last loss looks like a finished one, which is exactly the sort of
     # thing a status page should not let you believe.
-    failure = None
-    for pattern in (r"RuntimeError: (.+)", r"(\[METAL\].+)", r"(MemoryError.*)",
-                    r"(KeyboardInterrupt)"):
-        found = re.search(pattern, text)
-        if found:
-            failure = found.group(1).strip()[:180]
-            break
-
     running = process_alive("mlx_lm.lora")
-    last_iter = max([i for i, _ in train] + [i for i, _ in val] + [0])
+
+    # Only look for a failure in the *last* attempt, and only report one at all if
+    # nothing is running now. Showing the first error found in the whole log meant
+    # a live, recovering run displayed a red box from an attempt it had already
+    # recovered from -- which reads as "broken" when the truth is "retrying".
+    failure = None
+    if not running:
+        tail = (attempts[-1] if len(attempts) > 1 else text)
+        for pattern in (r"RuntimeError: (.+)", r"(\[METAL\].+)", r"(MemoryError.*)",
+                        r"(KeyboardInterrupt)"):
+            found = re.search(pattern, tail)
+            if found:
+                failure = found.group(1).strip()[:180]
+                break
+    retries = max(len(attempts) - 2, 0)
+    last_iter = max([i for i, _ in train] + [0])
     total = int(target.group(1)) if target else None
     if running:
         outcome = "running"
@@ -174,6 +191,7 @@ def training_state():
         "trainablePercent": trainable.group(1) if trainable else None,
         "trainableParams": trainable.group(2) if trainable else None,
         "adapterSaved": (ADAPTERS / "adapters.safetensors").exists(),
+        "retries": retries,
     }
 
 
@@ -263,6 +281,8 @@ def terminal(state):
             bits.append(f"peak {t['peakMemoryGB']:.2f} GB")
         if t.get("tokensPerSecond"):
             bits.append(f"{t['tokensPerSecond']:.0f} tok/s")
+        if t.get("retries"):
+            bits.append(f"{t['retries']} Metal restarts")
         if bits:
             out.append("  " + " · ".join(bits))
         out.append(f"  adapter saved: {'yes' if t['adapterSaved'] else 'not yet'}")
@@ -326,9 +346,9 @@ def svg_lines(series, width=520, height=180):
     out = [f"<svg viewBox='0 0 {width} {height}' role='img'>"]
     out.append(f"<line x1='{pad}' y1='{height - pad}' x2='{width - 6}' y2='{height - pad}' class='axis'/>")
     out.append(f"<line x1='{pad}' y1='8' x2='{pad}' y2='{height - pad}' class='axis'/>")
-    out.append(f"<text x='2' y='16' class='tick'>{y1:.2f}</text>")
-    out.append(f"<text x='2' y='{height - pad}' class='tick'>{y0:.2f}</text>")
-    out.append(f"<text x='{width - 40}' y='{height - 12}' class='tick'>iter {x1}</text>")
+    out.append(f"<text x='2' y='16' class='tick2'>{y1:.2f}</text>")
+    out.append(f"<text x='2' y='{height - pad}' class='tick2'>{y0:.2f}</text>")
+    out.append(f"<text x='{width - 40}' y='{height - 12}' class='tick2'>iter {x1}</text>")
     for colour, (name, pts) in zip(["#5856D6", "#FF9500"], series):
         if len(pts) < 2:
             continue
@@ -345,6 +365,12 @@ def render_html(state):
     d, t, evals = state["distill"], state["training"], state["eval"]
     pct = 100 * d["done"] / d["total"] if d["done"] else 0
     budget = 25.0
+
+    def summary_row(title, bits):
+        """A finished stage, in one line."""
+        cells = "".join(f"<span class='sm'><b>{v}</b>{k}</span>" for k, v in bits)
+        return (f"<section class='done'><h2>{html.escape(title)} "
+                f"<span class='tick'>done</span></h2><div class='sumrow'>{cells}</div></section>")
 
     def card(title, body, note=""):
         return (f"<section><h2>{html.escape(title)}</h2>{body}"
@@ -380,7 +406,10 @@ def render_html(state):
             + stats
             + f"<div class='track'><div class='fill' style='width:{pct_iter:.1f}%'></div></div>"
             + svg_lines([("train", t["train"]), ("validation", t["val"])])
-            + (f"<p class='muted'>{t['trainableParams']} trainable of 4.0B "
+            + (f"<p class='muted'>{t['retries']} Metal restart(s), resumed from "
+               f"checkpoints · " if t.get("retries") else "<p class='muted'>")
+            + (f"validation runs every 100 steps, so that figure "
+               f"holds between checkpoints · {t['trainableParams']} trainable of 4.0B "
                f"({t['trainablePercent']}%) · "
                f"{(t.get('tokensPerSecond') or 0):.0f} tok/s · adapter "
                f"{'saved' if t['adapterSaved'] else 'not yet saved'}</p>"
@@ -405,6 +434,35 @@ def render_html(state):
     else:
         eval_body = "<p class='muted'>no graded runs yet</p>"
 
+    # Order by what is actually happening. A completed stage collapses to one
+    # line, because the thing worth reading is the thing still moving -- and the
+    # finished distillation card was tall enough to push a live training run below
+    # the fold, which is the one job this page has.
+    distill_done = not d["running"] and d["done"] and d["done"] >= (d["total"] or 0)
+    sections = []
+
+    if t["started"] and (t["running"] or not distill_done):
+        sections.append(card("LoRA training (Qwen3-4B)", training_body))
+
+    if distill_done:
+        sections.append(summary_row("Distillation (Kimi K3)", [
+            (" examples", d["examples"]),
+            (" requests", f"{d['done']}/{d['total']}"),
+            (" failed", d["failures"]),
+            (" spent", f"${d['estimatedCost']:.2f}"),
+        ]))
+    else:
+        sections.append(card("Distillation (Kimi K3)", distill_body,
+            ("Spend is estimated from per-surface averages and has been wrong by 61% "
+             "before. " if d["costIsEstimate"] else "Spend is the run's own token ledger. ")
+            + "Kimi K3 at $3/$15 per Mtok; the console balance is authoritative, "
+              "since cache-hit input bills at $0.30."))
+
+    if not (t["started"] and (t["running"] or not distill_done)):
+        sections.append(card("LoRA training (Qwen3-4B)", training_body))
+
+    sections.append(card("Evaluation", eval_body))
+
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><title>Solvr — run status</title>
@@ -415,26 +473,32 @@ def render_html(state):
     :root {{ --bg:#111114; --card:#1C1C20; --text:#F2F2F7; --muted:#8E8E93; }}
   }}
   * {{ box-sizing:border-box }}
-  body {{ margin:0; padding:32px; background:var(--bg); color:var(--text);
+  body {{ margin:0; padding:26px 20px 40px; background:var(--bg); color:var(--text);
          font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif }}
-  h1 {{ font-size:26px; margin:0 0 4px }}
-  h2 {{ font-size:13px; text-transform:uppercase; letter-spacing:.06em;
-        color:var(--muted); margin:0 0 14px }}
-  .wrap {{ max-width:620px; margin:0 auto }}
-  section {{ background:var(--card); border-radius:14px; padding:20px; margin:16px 0 }}
-  .row {{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px }}
-  .stat {{ flex:1; min-width:110px; background:var(--bg); border-radius:10px; padding:10px 12px }}
-  .stat b {{ display:block; font-size:21px; font-variant-numeric:tabular-nums }}
-  .stat span {{ font-size:11px; color:var(--muted) }}
-  .track {{ height:8px; background:var(--bg); border-radius:99px; overflow:hidden }}
+  h1 {{ font-size:23px; margin:0 0 3px }}
+  h2 {{ font-size:12px; text-transform:uppercase; letter-spacing:.06em;
+        color:var(--muted); margin:0 0 12px }}
+  .wrap {{ max-width:600px; margin:0 auto }}
+  section {{ background:var(--card); border-radius:14px; padding:18px; margin:14px 0 }}
+  section.done {{ padding:12px 16px }}
+  section.done h2 {{ margin:0 0 6px }}
+  .tick {{ color:#34C759; letter-spacing:0; text-transform:none; font-weight:600 }}
+  .sumrow {{ display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--muted) }}
+  .sm b {{ color:var(--text); font-size:15px; margin-right:5px;
+           font-variant-numeric:tabular-nums }}
+  .row {{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px }}
+  .stat {{ flex:1; min-width:96px; background:var(--bg); border-radius:10px; padding:9px 11px }}
+  .stat b {{ display:block; font-size:19px; font-variant-numeric:tabular-nums }}
+  .stat span {{ font-size:10px; color:var(--muted) }}
+  .track {{ height:7px; background:var(--bg); border-radius:99px; overflow:hidden }}
   .fill {{ height:100%; background:var(--accent); border-radius:99px; transition:width .4s }}
-  .muted {{ color:var(--muted); font-size:12px; margin:10px 0 0 }}
-  svg {{ width:100%; height:auto; overflow:visible }}
+  .muted {{ color:var(--muted); font-size:12px; margin:9px 0 0 }}
+  svg {{ width:100%; height:auto; overflow:visible; margin-top:10px }}
   .lbl {{ font-size:12px; fill:var(--muted) }}
   .val {{ font-size:12px; fill:var(--text); font-variant-numeric:tabular-nums }}
   .axis {{ stroke:var(--muted); stroke-width:1; opacity:.3 }}
-  .tick {{ font-size:10px; fill:var(--muted) }}
-  .legend {{ margin-top:8px; font-size:11px; color:var(--muted) }}
+  .tick2 {{ font-size:10px; fill:var(--muted) }}
+  .legend {{ margin-top:6px; font-size:11px; color:var(--muted) }}
   .key {{ margin-right:12px }} .key i {{ display:inline-block; width:9px; height:9px;
         border-radius:2px; margin-right:5px }}
   table {{ width:100%; border-collapse:collapse; font-size:13px }}
@@ -447,21 +511,12 @@ def render_html(state):
   .err {{ background:rgba(255,59,48,.12); color:#FF6961; border-radius:8px;
           padding:9px 11px; font-size:12px; margin:12px 0 0;
           font-family:ui-monospace,SFMono-Regular,monospace }}
-  footer {{ color:var(--muted); font-size:11px; text-align:center; margin-top:8px }}
+  footer {{ color:var(--muted); font-size:11px; text-align:center; margin-top:6px }}
 </style></head><body><div class="wrap">
 <h1>Solvr — run status</h1>
-<p class="muted">Generated {time.strftime('%H:%M:%S')} · refreshes every 10s ·
-  regenerate with <span class="mono">tools/status/status.sh --watch</span></p>
-{card("Distillation (Kimi K3)", distill_body,
-      ("Spend is estimated from per-surface averages and has been wrong by 61% before — "
-       "the probe it was built from sampled only the simplest problems. "
-       if d["costIsEstimate"] else "Spend is the run's own token ledger, not an estimate. ")
-      + "Kimi K3 at $3/$15 per Mtok. Token counts are exact; the dollar figure "
-        "applies list price to them, so it reads high whenever input was served "
-        "from cache at $0.30 rather than $3. The console balance is authoritative "
-        "\u2014 it showed $2.91 left where this said $0.79.")}
-{card("LoRA training (Qwen3-4B)", training_body)}
-{card("Evaluation", eval_body)}
+<p class="muted">{time.strftime('%H:%M:%S')} · refreshes every 10s ·
+  <span class="mono">tools/status/watch.sh</span> keeps it current</p>
+{"".join(sections)}
 <footer>Reads the pipeline's own artefacts — no separate state to fall out of sync.</footer>
 </div></body></html>"""
 
