@@ -1,0 +1,2415 @@
+{
+ "note": "Templated synthetic problems for distillation. No student work, no names, no tutoring records. Reproducible from the seed below.",
+ "seed": 20260822,
+ "excludedBecauseReservedForEvaluation": [
+  "evaluate the definite integral of 3x^2 from 0 to 1",
+  "evaluate the sum of (1/2)^n for n from 0 to infinity",
+  "evaluate the sum of n for n from 1 to 10",
+  "find the derivative of f(x) = x^2 at x = 3",
+  "how many ways are there to choose 2 items from 5 distinct items?",
+  "solve for x: 3x + 7 = 22",
+  "solve the system: x + y = 10 and x - y = 2"
+ ],
+ "problems": [
+  {
+   "id": "gen-0000",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 7x + 3 = 28"
+  },
+  {
+   "id": "gen-0001",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 7x - 9 = 9"
+  },
+  {
+   "id": "gen-0002",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 10x + 25"
+  },
+  {
+   "id": "gen-0003",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 4)(x - 3)"
+  },
+  {
+   "id": "gen-0004",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 4"
+  },
+  {
+   "id": "gen-0005",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^3 \\cdot x^4) / x^4"
+  },
+  {
+   "id": "gen-0006",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 19 and x - y = 1"
+  },
+  {
+   "id": "gen-0007",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 2^x = 4"
+  },
+  {
+   "id": "gen-0008",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 2x^5"
+  },
+  {
+   "id": "gen-0009",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^3 + 6x"
+  },
+  {
+   "id": "gen-0010",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 5\\sin(x)"
+  },
+  {
+   "id": "gen-0011",
+   "topic": "derivatives",
+   "template": 11,
+   "problem": "Differentiate f(x) = x^3 e^x"
+  },
+  {
+   "id": "gen-0012",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(9x)"
+  },
+  {
+   "id": "gen-0013",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (6x + 9)^3"
+  },
+  {
+   "id": "gen-0014",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^5 at x = 1"
+  },
+  {
+   "id": "gen-0015",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^2}{x + 4}"
+  },
+  {
+   "id": "gen-0016",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 9x^4 from 0 to 3"
+  },
+  {
+   "id": "gen-0017",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 4x^4 dx"
+  },
+  {
+   "id": "gen-0018",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 6x from 1 to 6"
+  },
+  {
+   "id": "gen-0019",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(5x) dx"
+  },
+  {
+   "id": "gen-0020",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{7x} dx"
+  },
+  {
+   "id": "gen-0021",
+   "topic": "integrals",
+   "template": 21,
+   "problem": "Evaluate the definite integral of 1/x from 1 to e^2"
+  },
+  {
+   "id": "gen-0022",
+   "topic": "integrals",
+   "template": 22,
+   "problem": "Find the indefinite integral of x\\cos(x) dx"
+  },
+  {
+   "id": "gen-0023",
+   "topic": "trigonometry",
+   "template": 23,
+   "problem": "Evaluate \\sin(pi/6)"
+  },
+  {
+   "id": "gen-0024",
+   "topic": "trigonometry",
+   "template": 24,
+   "problem": "Evaluate \\cos(pi)"
+  },
+  {
+   "id": "gen-0025",
+   "topic": "trigonometry",
+   "template": 25,
+   "problem": "Solve \\cos(x) = 0 for x in [0, 2pi]"
+  },
+  {
+   "id": "gen-0026",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 6\\sin^2(x) + 3\\cos^2(x)"
+  },
+  {
+   "id": "gen-0027",
+   "topic": "trigonometry",
+   "template": 27,
+   "problem": "Expand \\cos(2x) using a double angle identity"
+  },
+  {
+   "id": "gen-0028",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(4x)"
+  },
+  {
+   "id": "gen-0029",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[8, 9], [7, 3]]"
+  },
+  {
+   "id": "gen-0030",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (8, 9, 5) and (3, 9, 4)"
+  },
+  {
+   "id": "gen-0031",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[4, 0], [0, 3]]"
+  },
+  {
+   "id": "gen-0032",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[2, 0], [0, 4]]"
+  },
+  {
+   "id": "gen-0033",
+   "topic": "linear algebra",
+   "template": 33,
+   "problem": "Compute the magnitude of the vector (4, 3)"
+  },
+  {
+   "id": "gen-0034",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (7x^2 + 9)/(x^2 - 3) as x approaches infinity"
+  },
+  {
+   "id": "gen-0035",
+   "topic": "limits and series",
+   "template": 35,
+   "problem": "Evaluate the sum of (1/4)^n for n from 0 to infinity"
+  },
+  {
+   "id": "gen-0036",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 15"
+  },
+  {
+   "id": "gen-0037",
+   "topic": "limits and series",
+   "template": 37,
+   "problem": "Give the first three terms of the Taylor series of \\sin(x) about x = 0"
+  },
+  {
+   "id": "gen-0038",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 16)/(x - 8) as x approaches 4"
+  },
+  {
+   "id": "gen-0039",
+   "topic": "probability",
+   "template": 39,
+   "problem": "A fair coin is flipped 2 times. What is the probability of all heads?"
+  },
+  {
+   "id": "gen-0040",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 2 items from 8 distinct items?"
+  },
+  {
+   "id": "gen-0041",
+   "topic": "probability",
+   "template": 41,
+   "problem": "What is the expected value of one roll of a fair 8-sided die?"
+  },
+  {
+   "id": "gen-0042",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 2 red and 6 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0043",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 7x + 7 = 33"
+  },
+  {
+   "id": "gen-0044",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 2x - 8 = 5"
+  },
+  {
+   "id": "gen-0045",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 16x + 64"
+  },
+  {
+   "id": "gen-0046",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 4)(x - 6)"
+  },
+  {
+   "id": "gen-0047",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 9"
+  },
+  {
+   "id": "gen-0048",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^3 \\cdot x^3) / x^4"
+  },
+  {
+   "id": "gen-0049",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 16 and x - y = 1"
+  },
+  {
+   "id": "gen-0050",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 3^x = 36"
+  },
+  {
+   "id": "gen-0051",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 5x^3"
+  },
+  {
+   "id": "gen-0052",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^4 + 6x"
+  },
+  {
+   "id": "gen-0053",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 6\\sin(x)"
+  },
+  {
+   "id": "gen-0054",
+   "topic": "derivatives",
+   "template": 11,
+   "problem": "Differentiate f(x) = x^4 e^x"
+  },
+  {
+   "id": "gen-0055",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(5x)"
+  },
+  {
+   "id": "gen-0056",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (7x + 6)^2"
+  },
+  {
+   "id": "gen-0057",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^5 at x = 2"
+  },
+  {
+   "id": "gen-0058",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^5}{x + 4}"
+  },
+  {
+   "id": "gen-0059",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 3x^5 from 0 to 1"
+  },
+  {
+   "id": "gen-0060",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 3x^4 dx"
+  },
+  {
+   "id": "gen-0061",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 6x from 2 to 4"
+  },
+  {
+   "id": "gen-0062",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(7x) dx"
+  },
+  {
+   "id": "gen-0063",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{2x} dx"
+  },
+  {
+   "id": "gen-0064",
+   "topic": "integrals",
+   "template": 21,
+   "problem": "Evaluate the definite integral of 1/x from 1 to e^3"
+  },
+  {
+   "id": "gen-0065",
+   "topic": "trigonometry",
+   "template": 23,
+   "problem": "Evaluate \\sin(pi/3)"
+  },
+  {
+   "id": "gen-0066",
+   "topic": "trigonometry",
+   "template": 24,
+   "problem": "Evaluate \\cos(pi/6)"
+  },
+  {
+   "id": "gen-0067",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 7\\sin^2(x) + 3\\cos^2(x)"
+  },
+  {
+   "id": "gen-0068",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(9x)"
+  },
+  {
+   "id": "gen-0069",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[7, 5], [7, 3]]"
+  },
+  {
+   "id": "gen-0070",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (5, 6, 3) and (6, 4, 4)"
+  },
+  {
+   "id": "gen-0071",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[6, 0], [0, 7]]"
+  },
+  {
+   "id": "gen-0072",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[8, 0], [0, 6]]"
+  },
+  {
+   "id": "gen-0073",
+   "topic": "linear algebra",
+   "template": 33,
+   "problem": "Compute the magnitude of the vector (4, 4)"
+  },
+  {
+   "id": "gen-0074",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (5x^2 + 3)/(x^2 - 8) as x approaches infinity"
+  },
+  {
+   "id": "gen-0075",
+   "topic": "limits and series",
+   "template": 35,
+   "problem": "Evaluate the sum of (1/3)^n for n from 0 to infinity"
+  },
+  {
+   "id": "gen-0076",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 23"
+  },
+  {
+   "id": "gen-0077",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 64)/(x - 6) as x approaches 3"
+  },
+  {
+   "id": "gen-0078",
+   "topic": "probability",
+   "template": 39,
+   "problem": "A fair coin is flipped 4 times. What is the probability of all heads?"
+  },
+  {
+   "id": "gen-0079",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 2 items from 7 distinct items?"
+  },
+  {
+   "id": "gen-0080",
+   "topic": "probability",
+   "template": 41,
+   "problem": "What is the expected value of one roll of a fair 12-sided die?"
+  },
+  {
+   "id": "gen-0081",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 5 red and 5 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0082",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 7x + 5 = 39"
+  },
+  {
+   "id": "gen-0083",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 9x - 6 = 14"
+  },
+  {
+   "id": "gen-0084",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 8x + 16"
+  },
+  {
+   "id": "gen-0085",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 4)(x - 8)"
+  },
+  {
+   "id": "gen-0086",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 16"
+  },
+  {
+   "id": "gen-0087",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^5 \\cdot x^3) / x^3"
+  },
+  {
+   "id": "gen-0088",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 19 and x - y = 2"
+  },
+  {
+   "id": "gen-0089",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 6^x = 9"
+  },
+  {
+   "id": "gen-0090",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 8x^3"
+  },
+  {
+   "id": "gen-0091",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^5 + 9x"
+  },
+  {
+   "id": "gen-0092",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 4\\sin(x)"
+  },
+  {
+   "id": "gen-0093",
+   "topic": "derivatives",
+   "template": 11,
+   "problem": "Differentiate f(x) = x^5 e^x"
+  },
+  {
+   "id": "gen-0094",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(8x)"
+  },
+  {
+   "id": "gen-0095",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (7x + 5)^4"
+  },
+  {
+   "id": "gen-0096",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^2 at x = 4"
+  },
+  {
+   "id": "gen-0097",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^4}{x + 7}"
+  },
+  {
+   "id": "gen-0098",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 3x^3 from 0 to 1"
+  },
+  {
+   "id": "gen-0099",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 7x^4 dx"
+  },
+  {
+   "id": "gen-0100",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 3x from 2 to 5"
+  },
+  {
+   "id": "gen-0101",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(8x) dx"
+  },
+  {
+   "id": "gen-0102",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{8x} dx"
+  },
+  {
+   "id": "gen-0103",
+   "topic": "trigonometry",
+   "template": 23,
+   "problem": "Evaluate \\sin(pi/4)"
+  },
+  {
+   "id": "gen-0104",
+   "topic": "trigonometry",
+   "template": 24,
+   "problem": "Evaluate \\cos(pi/4)"
+  },
+  {
+   "id": "gen-0105",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 4\\sin^2(x) + 7\\cos^2(x)"
+  },
+  {
+   "id": "gen-0106",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(5x)"
+  },
+  {
+   "id": "gen-0107",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[5, 2], [8, 2]]"
+  },
+  {
+   "id": "gen-0108",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (3, 9, 9) and (9, 9, 4)"
+  },
+  {
+   "id": "gen-0109",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[9, 0], [0, 4]]"
+  },
+  {
+   "id": "gen-0110",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[8, 0], [0, 9]]"
+  },
+  {
+   "id": "gen-0111",
+   "topic": "linear algebra",
+   "template": 33,
+   "problem": "Compute the magnitude of the vector (3, 3)"
+  },
+  {
+   "id": "gen-0112",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (4x^2 + 7)/(x^2 - 2) as x approaches infinity"
+  },
+  {
+   "id": "gen-0113",
+   "topic": "limits and series",
+   "template": 35,
+   "problem": "Evaluate the sum of (1/5)^n for n from 0 to infinity"
+  },
+  {
+   "id": "gen-0114",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 5"
+  },
+  {
+   "id": "gen-0115",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 64)/(x - 8) as x approaches 3"
+  },
+  {
+   "id": "gen-0116",
+   "topic": "probability",
+   "template": 39,
+   "problem": "A fair coin is flipped 3 times. What is the probability of all heads?"
+  },
+  {
+   "id": "gen-0117",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 3 items from 4 distinct items?"
+  },
+  {
+   "id": "gen-0118",
+   "topic": "probability",
+   "template": 41,
+   "problem": "What is the expected value of one roll of a fair 4-sided die?"
+  },
+  {
+   "id": "gen-0119",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 6 red and 4 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0120",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 4x + 9 = 37"
+  },
+  {
+   "id": "gen-0121",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 4x - 4 = 18"
+  },
+  {
+   "id": "gen-0122",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 7x + 6"
+  },
+  {
+   "id": "gen-0123",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 8)(x - 9)"
+  },
+  {
+   "id": "gen-0124",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 25"
+  },
+  {
+   "id": "gen-0125",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^4 \\cdot x^2) / x^4"
+  },
+  {
+   "id": "gen-0126",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 6 and x - y = 6"
+  },
+  {
+   "id": "gen-0127",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 5^x = 27"
+  },
+  {
+   "id": "gen-0128",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 4x^3"
+  },
+  {
+   "id": "gen-0129",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^3 + 2x"
+  },
+  {
+   "id": "gen-0130",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 2\\sin(x)"
+  },
+  {
+   "id": "gen-0131",
+   "topic": "derivatives",
+   "template": 11,
+   "problem": "Differentiate f(x) = x^2 e^x"
+  },
+  {
+   "id": "gen-0132",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(6x)"
+  },
+  {
+   "id": "gen-0133",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (8x + 3)^2"
+  },
+  {
+   "id": "gen-0134",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^3 at x = 2"
+  },
+  {
+   "id": "gen-0135",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^3}{x + 5}"
+  },
+  {
+   "id": "gen-0136",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 9x^5 from 0 to 3"
+  },
+  {
+   "id": "gen-0137",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 3x^2 dx"
+  },
+  {
+   "id": "gen-0138",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 5x from 2 to 8"
+  },
+  {
+   "id": "gen-0139",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(9x) dx"
+  },
+  {
+   "id": "gen-0140",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{3x} dx"
+  },
+  {
+   "id": "gen-0141",
+   "topic": "trigonometry",
+   "template": 23,
+   "problem": "Evaluate \\sin(pi/2)"
+  },
+  {
+   "id": "gen-0142",
+   "topic": "trigonometry",
+   "template": 24,
+   "problem": "Evaluate \\cos(pi/3)"
+  },
+  {
+   "id": "gen-0143",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 3\\sin^2(x) + 2\\cos^2(x)"
+  },
+  {
+   "id": "gen-0144",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(8x)"
+  },
+  {
+   "id": "gen-0145",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[8, 3], [7, 4]]"
+  },
+  {
+   "id": "gen-0146",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (7, 8, 4) and (8, 9, 2)"
+  },
+  {
+   "id": "gen-0147",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[4, 0], [0, 2]]"
+  },
+  {
+   "id": "gen-0148",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[4, 0], [0, 5]]"
+  },
+  {
+   "id": "gen-0149",
+   "topic": "linear algebra",
+   "template": 33,
+   "problem": "Compute the magnitude of the vector (3, 4)"
+  },
+  {
+   "id": "gen-0150",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (4x^2 + 3)/(x^2 - 2) as x approaches infinity"
+  },
+  {
+   "id": "gen-0151",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 18"
+  },
+  {
+   "id": "gen-0152",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 64)/(x - 3) as x approaches 8"
+  },
+  {
+   "id": "gen-0153",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 3 items from 7 distinct items?"
+  },
+  {
+   "id": "gen-0154",
+   "topic": "probability",
+   "template": 41,
+   "problem": "What is the expected value of one roll of a fair 6-sided die?"
+  },
+  {
+   "id": "gen-0155",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 3 red and 3 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0156",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 8x + 6 = 33"
+  },
+  {
+   "id": "gen-0157",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 4x - 4 = 11"
+  },
+  {
+   "id": "gen-0158",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 13x + 42"
+  },
+  {
+   "id": "gen-0159",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 7)(x - 5)"
+  },
+  {
+   "id": "gen-0160",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 64"
+  },
+  {
+   "id": "gen-0161",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^2 \\cdot x^3) / x^4"
+  },
+  {
+   "id": "gen-0162",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 14 and x - y = 3"
+  },
+  {
+   "id": "gen-0163",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 5^x = 729"
+  },
+  {
+   "id": "gen-0164",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 8x^4"
+  },
+  {
+   "id": "gen-0165",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^4 + 4x"
+  },
+  {
+   "id": "gen-0166",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 8\\sin(x)"
+  },
+  {
+   "id": "gen-0167",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(7x)"
+  },
+  {
+   "id": "gen-0168",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (4x + 4)^5"
+  },
+  {
+   "id": "gen-0169",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^4 at x = 4"
+  },
+  {
+   "id": "gen-0170",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^4}{x + 6}"
+  },
+  {
+   "id": "gen-0171",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 3x^3 from 0 to 2"
+  },
+  {
+   "id": "gen-0172",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 9x^5 dx"
+  },
+  {
+   "id": "gen-0173",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 9x from 1 to 7"
+  },
+  {
+   "id": "gen-0174",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(2x) dx"
+  },
+  {
+   "id": "gen-0175",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{6x} dx"
+  },
+  {
+   "id": "gen-0176",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 5\\sin^2(x) + 5\\cos^2(x)"
+  },
+  {
+   "id": "gen-0177",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(7x)"
+  },
+  {
+   "id": "gen-0178",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[7, 4], [9, 7]]"
+  },
+  {
+   "id": "gen-0179",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (5, 7, 4) and (7, 5, 2)"
+  },
+  {
+   "id": "gen-0180",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[8, 0], [0, 5]]"
+  },
+  {
+   "id": "gen-0181",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[9, 0], [0, 9]]"
+  },
+  {
+   "id": "gen-0182",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (2x^2 + 8)/(x^2 - 8) as x approaches infinity"
+  },
+  {
+   "id": "gen-0183",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 7"
+  },
+  {
+   "id": "gen-0184",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 9)/(x - 4) as x approaches 9"
+  },
+  {
+   "id": "gen-0185",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 2 items from 6 distinct items?"
+  },
+  {
+   "id": "gen-0186",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 4 red and 2 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0187",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 8x + 8 = 20"
+  },
+  {
+   "id": "gen-0188",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 9x - 2 = 13"
+  },
+  {
+   "id": "gen-0189",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 10x + 24"
+  },
+  {
+   "id": "gen-0190",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 8)(x - 5)"
+  },
+  {
+   "id": "gen-0191",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 100"
+  },
+  {
+   "id": "gen-0192",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^2 \\cdot x^5) / x^4"
+  },
+  {
+   "id": "gen-0193",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 11 and x - y = 3"
+  },
+  {
+   "id": "gen-0194",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 8^x = 125"
+  },
+  {
+   "id": "gen-0195",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 4x^4"
+  },
+  {
+   "id": "gen-0196",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^2 + 5x"
+  },
+  {
+   "id": "gen-0197",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 3\\sin(x)"
+  },
+  {
+   "id": "gen-0198",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(3x)"
+  },
+  {
+   "id": "gen-0199",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (8x + 3)^4"
+  },
+  {
+   "id": "gen-0200",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^3 at x = 1"
+  },
+  {
+   "id": "gen-0201",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^3}{x + 7}"
+  },
+  {
+   "id": "gen-0202",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 7x^2 from 0 to 2"
+  },
+  {
+   "id": "gen-0203",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 5x^2 dx"
+  },
+  {
+   "id": "gen-0204",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 6x from 3 to 4"
+  },
+  {
+   "id": "gen-0205",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(4x) dx"
+  },
+  {
+   "id": "gen-0206",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{9x} dx"
+  },
+  {
+   "id": "gen-0207",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 6\\sin^2(x) + 9\\cos^2(x)"
+  },
+  {
+   "id": "gen-0208",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(3x)"
+  },
+  {
+   "id": "gen-0209",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[5, 3], [9, 6]]"
+  },
+  {
+   "id": "gen-0210",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (4, 3, 9) and (2, 5, 4)"
+  },
+  {
+   "id": "gen-0211",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[3, 0], [0, 6]]"
+  },
+  {
+   "id": "gen-0212",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[5, 0], [0, 8]]"
+  },
+  {
+   "id": "gen-0213",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (7x^2 + 2)/(x^2 - 8) as x approaches infinity"
+  },
+  {
+   "id": "gen-0214",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 21"
+  },
+  {
+   "id": "gen-0215",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 49)/(x - 3) as x approaches 5"
+  },
+  {
+   "id": "gen-0216",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 3 items from 5 distinct items?"
+  },
+  {
+   "id": "gen-0217",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 3 red and 6 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0218",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 6x + 2 = 31"
+  },
+  {
+   "id": "gen-0219",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 2x - 2 = 18"
+  },
+  {
+   "id": "gen-0220",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 14x + 49"
+  },
+  {
+   "id": "gen-0221",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 6)(x - 4)"
+  },
+  {
+   "id": "gen-0222",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 49"
+  },
+  {
+   "id": "gen-0223",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^4 \\cdot x^5) / x^4"
+  },
+  {
+   "id": "gen-0224",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 9 and x - y = 2"
+  },
+  {
+   "id": "gen-0225",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 7^x = 27"
+  },
+  {
+   "id": "gen-0226",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 6x^3"
+  },
+  {
+   "id": "gen-0227",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^5 + 7x"
+  },
+  {
+   "id": "gen-0228",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 9\\sin(x)"
+  },
+  {
+   "id": "gen-0229",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(2x)"
+  },
+  {
+   "id": "gen-0230",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (2x + 9)^3"
+  },
+  {
+   "id": "gen-0231",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^4 at x = 1"
+  },
+  {
+   "id": "gen-0232",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^5}{x + 8}"
+  },
+  {
+   "id": "gen-0233",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 2x^4 from 0 to 2"
+  },
+  {
+   "id": "gen-0234",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 6x^4 dx"
+  },
+  {
+   "id": "gen-0235",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 9x from 3 to 6"
+  },
+  {
+   "id": "gen-0236",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(6x) dx"
+  },
+  {
+   "id": "gen-0237",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{5x} dx"
+  },
+  {
+   "id": "gen-0238",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 7\\sin^2(x) + 4\\cos^2(x)"
+  },
+  {
+   "id": "gen-0239",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(2x)"
+  },
+  {
+   "id": "gen-0240",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[5, 6], [3, 9]]"
+  },
+  {
+   "id": "gen-0241",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (2, 4, 4) and (2, 5, 3)"
+  },
+  {
+   "id": "gen-0242",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[7, 0], [0, 6]]"
+  },
+  {
+   "id": "gen-0243",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[7, 0], [0, 4]]"
+  },
+  {
+   "id": "gen-0244",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (6x^2 + 4)/(x^2 - 2) as x approaches infinity"
+  },
+  {
+   "id": "gen-0245",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 13"
+  },
+  {
+   "id": "gen-0246",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 36)/(x - 3) as x approaches 6"
+  },
+  {
+   "id": "gen-0247",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 3 items from 6 distinct items?"
+  },
+  {
+   "id": "gen-0248",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 5 red and 4 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0249",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 5x + 6 = 15"
+  },
+  {
+   "id": "gen-0250",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 3x - 2 = 8"
+  },
+  {
+   "id": "gen-0251",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 12x + 27"
+  },
+  {
+   "id": "gen-0252",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 6)(x - 5)"
+  },
+  {
+   "id": "gen-0253",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 144"
+  },
+  {
+   "id": "gen-0254",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^2 \\cdot x^2) / x^2"
+  },
+  {
+   "id": "gen-0255",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 9 and x - y = 4"
+  },
+  {
+   "id": "gen-0256",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 5^x = 125"
+  },
+  {
+   "id": "gen-0257",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 7x^5"
+  },
+  {
+   "id": "gen-0258",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^2 + 4x"
+  },
+  {
+   "id": "gen-0259",
+   "topic": "derivatives",
+   "template": 10,
+   "problem": "Differentiate f(x) = 7\\sin(x)"
+  },
+  {
+   "id": "gen-0260",
+   "topic": "derivatives",
+   "template": 12,
+   "problem": "Differentiate f(x) = \\ln(4x)"
+  },
+  {
+   "id": "gen-0261",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (8x + 9)^5"
+  },
+  {
+   "id": "gen-0262",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^2 at x = 1"
+  },
+  {
+   "id": "gen-0263",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^2}{x + 5}"
+  },
+  {
+   "id": "gen-0264",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 2x^5 from 0 to 1"
+  },
+  {
+   "id": "gen-0265",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 8x^5 dx"
+  },
+  {
+   "id": "gen-0266",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 2x from 1 to 8"
+  },
+  {
+   "id": "gen-0267",
+   "topic": "integrals",
+   "template": 19,
+   "problem": "Find the indefinite integral of \\sin(3x) dx"
+  },
+  {
+   "id": "gen-0268",
+   "topic": "integrals",
+   "template": 20,
+   "problem": "Find the indefinite integral of e^{4x} dx"
+  },
+  {
+   "id": "gen-0269",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 2\\sin^2(x) + 3\\cos^2(x)"
+  },
+  {
+   "id": "gen-0270",
+   "topic": "trigonometry",
+   "template": 28,
+   "problem": "Find the period of f(x) = \\sin(6x)"
+  },
+  {
+   "id": "gen-0271",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[8, 5], [7, 8]]"
+  },
+  {
+   "id": "gen-0272",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (8, 2, 2) and (2, 6, 5)"
+  },
+  {
+   "id": "gen-0273",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[4, 0], [0, 5]]"
+  },
+  {
+   "id": "gen-0274",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[9, 0], [0, 2]]"
+  },
+  {
+   "id": "gen-0275",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (3x^2 + 7)/(x^2 - 9) as x approaches infinity"
+  },
+  {
+   "id": "gen-0276",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 16"
+  },
+  {
+   "id": "gen-0277",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 25)/(x - 4) as x approaches 2"
+  },
+  {
+   "id": "gen-0278",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 2 items from 4 distinct items?"
+  },
+  {
+   "id": "gen-0279",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 5 red and 6 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0280",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 6x + 3 = 39"
+  },
+  {
+   "id": "gen-0281",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 5x - 9 = 4"
+  },
+  {
+   "id": "gen-0282",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 15x + 54"
+  },
+  {
+   "id": "gen-0283",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 9)(x - 2)"
+  },
+  {
+   "id": "gen-0284",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 36"
+  },
+  {
+   "id": "gen-0285",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^2 \\cdot x^2) / x^5"
+  },
+  {
+   "id": "gen-0286",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 13 and x - y = 3"
+  },
+  {
+   "id": "gen-0287",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 3^x = 25"
+  },
+  {
+   "id": "gen-0288",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 2x^2"
+  },
+  {
+   "id": "gen-0289",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^5 + 5x"
+  },
+  {
+   "id": "gen-0290",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (6x + 7)^4"
+  },
+  {
+   "id": "gen-0291",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^3 at x = 4"
+  },
+  {
+   "id": "gen-0292",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^4}{x + 5}"
+  },
+  {
+   "id": "gen-0293",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 4x^4 from 0 to 2"
+  },
+  {
+   "id": "gen-0294",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 8x^2 dx"
+  },
+  {
+   "id": "gen-0295",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 2x from 1 to 4"
+  },
+  {
+   "id": "gen-0296",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 8\\sin^2(x) + 3\\cos^2(x)"
+  },
+  {
+   "id": "gen-0297",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[6, 2], [6, 9]]"
+  },
+  {
+   "id": "gen-0298",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (3, 5, 2) and (6, 6, 3)"
+  },
+  {
+   "id": "gen-0299",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[2, 0], [0, 2]]"
+  },
+  {
+   "id": "gen-0300",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[3, 0], [0, 9]]"
+  },
+  {
+   "id": "gen-0301",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (5x^2 + 4)/(x^2 - 7) as x approaches infinity"
+  },
+  {
+   "id": "gen-0302",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 28"
+  },
+  {
+   "id": "gen-0303",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 64)/(x - 8) as x approaches 8"
+  },
+  {
+   "id": "gen-0304",
+   "topic": "probability",
+   "template": 40,
+   "problem": "How many ways are there to choose 3 items from 8 distinct items?"
+  },
+  {
+   "id": "gen-0305",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 6 red and 5 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0306",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 3x + 5 = 19"
+  },
+  {
+   "id": "gen-0307",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 5x - 7 = 8"
+  },
+  {
+   "id": "gen-0308",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 4x + 4"
+  },
+  {
+   "id": "gen-0309",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 9)(x - 6)"
+  },
+  {
+   "id": "gen-0310",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 121"
+  },
+  {
+   "id": "gen-0311",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^4 \\cdot x^3) / x^5"
+  },
+  {
+   "id": "gen-0312",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 17 and x - y = 3"
+  },
+  {
+   "id": "gen-0313",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 5^x = 25"
+  },
+  {
+   "id": "gen-0314",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 5x^4"
+  },
+  {
+   "id": "gen-0315",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^2 + 2x"
+  },
+  {
+   "id": "gen-0316",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (9x + 3)^2"
+  },
+  {
+   "id": "gen-0317",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^5 at x = 4"
+  },
+  {
+   "id": "gen-0318",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^5}{x + 3}"
+  },
+  {
+   "id": "gen-0319",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 9x^4 from 0 to 1"
+  },
+  {
+   "id": "gen-0320",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 2x^4 dx"
+  },
+  {
+   "id": "gen-0321",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 5x from 3 to 8"
+  },
+  {
+   "id": "gen-0322",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 3\\sin^2(x) + 8\\cos^2(x)"
+  },
+  {
+   "id": "gen-0323",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[2, 4], [4, 6]]"
+  },
+  {
+   "id": "gen-0324",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (6, 2, 4) and (7, 2, 6)"
+  },
+  {
+   "id": "gen-0325",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[3, 0], [0, 8]]"
+  },
+  {
+   "id": "gen-0326",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[9, 0], [0, 8]]"
+  },
+  {
+   "id": "gen-0327",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (9x^2 + 2)/(x^2 - 2) as x approaches infinity"
+  },
+  {
+   "id": "gen-0328",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 26"
+  },
+  {
+   "id": "gen-0329",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 9)/(x - 2) as x approaches 5"
+  },
+  {
+   "id": "gen-0330",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 5 red and 2 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0331",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 5x + 7 = 19"
+  },
+  {
+   "id": "gen-0332",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 2x - 3 = 3"
+  },
+  {
+   "id": "gen-0333",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 8x + 12"
+  },
+  {
+   "id": "gen-0334",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 6)(x - 3)"
+  },
+  {
+   "id": "gen-0335",
+   "topic": "algebra",
+   "template": 4,
+   "problem": "Solve for x: x^2 = 81"
+  },
+  {
+   "id": "gen-0336",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^5 \\cdot x^5) / x^3"
+  },
+  {
+   "id": "gen-0337",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 16 and x - y = 5"
+  },
+  {
+   "id": "gen-0338",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 6^x = 343"
+  },
+  {
+   "id": "gen-0339",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 5x^2"
+  },
+  {
+   "id": "gen-0340",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^4 + 8x"
+  },
+  {
+   "id": "gen-0341",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (2x + 7)^4"
+  },
+  {
+   "id": "gen-0342",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^4 at x = 3"
+  },
+  {
+   "id": "gen-0343",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^4}{x + 3}"
+  },
+  {
+   "id": "gen-0344",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 9x^3 from 0 to 3"
+  },
+  {
+   "id": "gen-0345",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 7x^5 dx"
+  },
+  {
+   "id": "gen-0346",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 3x from 2 to 4"
+  },
+  {
+   "id": "gen-0347",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 4\\sin^2(x) + 4\\cos^2(x)"
+  },
+  {
+   "id": "gen-0348",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[6, 7], [2, 7]]"
+  },
+  {
+   "id": "gen-0349",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (5, 4, 3) and (9, 2, 9)"
+  },
+  {
+   "id": "gen-0350",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[3, 0], [0, 4]]"
+  },
+  {
+   "id": "gen-0351",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[8, 0], [0, 3]]"
+  },
+  {
+   "id": "gen-0352",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (9x^2 + 4)/(x^2 - 4) as x approaches infinity"
+  },
+  {
+   "id": "gen-0353",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 24"
+  },
+  {
+   "id": "gen-0354",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 49)/(x - 5) as x approaches 5"
+  },
+  {
+   "id": "gen-0355",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 4 red and 5 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0356",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 8x + 4 = 21"
+  },
+  {
+   "id": "gen-0357",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 2x - 4 = 18"
+  },
+  {
+   "id": "gen-0358",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 9x + 8"
+  },
+  {
+   "id": "gen-0359",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 2)(x - 3)"
+  },
+  {
+   "id": "gen-0360",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^2 \\cdot x^4) / x^4"
+  },
+  {
+   "id": "gen-0361",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 12 and x - y = 4"
+  },
+  {
+   "id": "gen-0362",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 9^x = 8"
+  },
+  {
+   "id": "gen-0363",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 9x^2"
+  },
+  {
+   "id": "gen-0364",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^3 + 7x"
+  },
+  {
+   "id": "gen-0365",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (8x + 7)^4"
+  },
+  {
+   "id": "gen-0366",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^4 at x = 2"
+  },
+  {
+   "id": "gen-0367",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^2}{x + 8}"
+  },
+  {
+   "id": "gen-0368",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 2x^4 from 0 to 1"
+  },
+  {
+   "id": "gen-0369",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 8x^4 dx"
+  },
+  {
+   "id": "gen-0370",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 7x from 3 to 4"
+  },
+  {
+   "id": "gen-0371",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 9\\sin^2(x) + 6\\cos^2(x)"
+  },
+  {
+   "id": "gen-0372",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[5, 6], [2, 7]]"
+  },
+  {
+   "id": "gen-0373",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (8, 2, 9) and (7, 2, 3)"
+  },
+  {
+   "id": "gen-0374",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[5, 0], [0, 6]]"
+  },
+  {
+   "id": "gen-0375",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[4, 0], [0, 6]]"
+  },
+  {
+   "id": "gen-0376",
+   "topic": "limits and series",
+   "template": 34,
+   "problem": "Evaluate the limit of (5x^2 + 8)/(x^2 - 7) as x approaches infinity"
+  },
+  {
+   "id": "gen-0377",
+   "topic": "limits and series",
+   "template": 36,
+   "problem": "Evaluate the sum of n for n from 1 to 11"
+  },
+  {
+   "id": "gen-0378",
+   "topic": "limits and series",
+   "template": 38,
+   "problem": "Evaluate the limit of (x^2 - 64)/(x - 3) as x approaches 4"
+  },
+  {
+   "id": "gen-0379",
+   "topic": "probability",
+   "template": 42,
+   "problem": "A bag has 5 red and 3 blue balls. What is the probability of drawing red?"
+  },
+  {
+   "id": "gen-0380",
+   "topic": "algebra",
+   "template": 0,
+   "problem": "Solve for x: 3x + 9 = 12"
+  },
+  {
+   "id": "gen-0381",
+   "topic": "algebra",
+   "template": 1,
+   "problem": "Solve for x: 6x - 4 = 5"
+  },
+  {
+   "id": "gen-0382",
+   "topic": "algebra",
+   "template": 2,
+   "problem": "Factor completely: x^2 + 10x + 16"
+  },
+  {
+   "id": "gen-0383",
+   "topic": "algebra",
+   "template": 3,
+   "problem": "Expand and simplify: (x + 5)(x - 7)"
+  },
+  {
+   "id": "gen-0384",
+   "topic": "algebra",
+   "template": 5,
+   "problem": "Simplify: (x^5 \\cdot x^4) / x^4"
+  },
+  {
+   "id": "gen-0385",
+   "topic": "algebra",
+   "template": 6,
+   "problem": "Solve the system: x + y = 18 and x - y = 1"
+  },
+  {
+   "id": "gen-0386",
+   "topic": "algebra",
+   "template": 7,
+   "problem": "Solve for x: 7^x = 4"
+  },
+  {
+   "id": "gen-0387",
+   "topic": "derivatives",
+   "template": 8,
+   "problem": "Differentiate f(x) = 6x^5"
+  },
+  {
+   "id": "gen-0388",
+   "topic": "derivatives",
+   "template": 9,
+   "problem": "Differentiate f(x) = x^2 + 9x"
+  },
+  {
+   "id": "gen-0389",
+   "topic": "derivatives",
+   "template": 13,
+   "problem": "Differentiate f(x) = (2x + 9)^2"
+  },
+  {
+   "id": "gen-0390",
+   "topic": "derivatives",
+   "template": 14,
+   "problem": "Find the derivative of f(x) = x^5 at x = 3"
+  },
+  {
+   "id": "gen-0391",
+   "topic": "derivatives",
+   "template": 15,
+   "problem": "Differentiate f(x) = \\frac{x^5}{x + 5}"
+  },
+  {
+   "id": "gen-0392",
+   "topic": "integrals",
+   "template": 16,
+   "problem": "Evaluate the definite integral of 9x^5 from 0 to 2"
+  },
+  {
+   "id": "gen-0393",
+   "topic": "integrals",
+   "template": 17,
+   "problem": "Find the indefinite integral of 4x^3 dx"
+  },
+  {
+   "id": "gen-0394",
+   "topic": "integrals",
+   "template": 18,
+   "problem": "Evaluate the definite integral of 8x from 1 to 7"
+  },
+  {
+   "id": "gen-0395",
+   "topic": "trigonometry",
+   "template": 26,
+   "problem": "Simplify: 3\\sin^2(x) + 7\\cos^2(x)"
+  },
+  {
+   "id": "gen-0396",
+   "topic": "linear algebra",
+   "template": 29,
+   "problem": "Compute the determinant of [[6, 6], [7, 8]]"
+  },
+  {
+   "id": "gen-0397",
+   "topic": "linear algebra",
+   "template": 30,
+   "problem": "Compute the dot product of (8, 6, 4) and (4, 5, 7)"
+  },
+  {
+   "id": "gen-0398",
+   "topic": "linear algebra",
+   "template": 31,
+   "problem": "Find the inverse of [[2, 0], [0, 6]]"
+  },
+  {
+   "id": "gen-0399",
+   "topic": "linear algebra",
+   "template": 32,
+   "problem": "Find the eigenvalues of [[7, 0], [0, 8]]"
+  }
+ ]
+}

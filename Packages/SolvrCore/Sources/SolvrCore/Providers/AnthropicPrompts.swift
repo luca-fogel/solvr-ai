@@ -14,9 +14,9 @@ import Foundation
 /// unconstrained arms of the evaluation differ in exactly one thing: the decoding
 /// mechanism. Changing the prompt at the same time would make the comparison
 /// measure two changes and attribute both to one.
-enum AnthropicPrompts {
+public enum AnthropicPrompts {
 
-    static func clause(_ input: ProblemInput) -> String {
+    public static func clause(_ input: ProblemInput) -> String {
         switch input {
         case .text(let problem):
             return "The student submitted this problem: '\(problem)'."
@@ -25,7 +25,7 @@ enum AnthropicPrompts {
         }
     }
 
-    static func lesson(_ input: ProblemInput) -> String {
+    public static func lesson(_ input: ProblemInput) -> String {
         """
         You are a world-class math tutor. \(clause(input))
 
@@ -58,7 +58,7 @@ enum AnthropicPrompts {
         """
     }
 
-    static func formulas(_ input: ProblemInput) -> String {
+    public static func formulas(_ input: ProblemInput) -> String {
         """
         \(clause(input)) List 3-6 key mathematical formulas relevant to it.
 
@@ -73,7 +73,7 @@ enum AnthropicPrompts {
         """
     }
 
-    static func steps(_ input: ProblemInput) -> String {
+    public static func steps(_ input: ProblemInput) -> String {
         """
         \(clause(input)) Solve it step by step.
 
@@ -92,7 +92,7 @@ enum AnthropicPrompts {
         """
     }
 
-    static func videos(_ input: ProblemInput) -> String {
+    public static func videos(_ input: ProblemInput) -> String {
         """
         \(clause(input)) \
         Suggest 4-5 specific YouTube educational videos for learning about this math topic. \
@@ -105,7 +105,7 @@ enum AnthropicPrompts {
         """
     }
 
-    static func title(_ input: ProblemInput) -> String {
+    public static func title(_ input: ProblemInput) -> String {
         """
         \(clause(input))
 
@@ -115,7 +115,7 @@ enum AnthropicPrompts {
         """
     }
 
-    static func chatSystem(_ problem: String) -> String {
+    public static func chatSystem(_ problem: String) -> String {
         """
         You are a friendly, patient math tutor. The student is working on this problem: '\(problem)'. \
         They've already seen the lesson and step-by-step solution. \

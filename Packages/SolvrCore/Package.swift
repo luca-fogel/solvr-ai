@@ -16,6 +16,7 @@ let package = Package(
     products: [
         .library(name: "SolvrCore", targets: ["SolvrCore"]),
         .executable(name: "solvr-eval", targets: ["solvr-eval"]),
+        .executable(name: "solvr-distill", targets: ["solvr-distill"]),
     ],
     targets: [
         .target(name: "SolvrCore"),
@@ -23,6 +24,7 @@ let package = Package(
             name: "solvr-eval",
             dependencies: ["SolvrCore"],
             resources: [.copy("problems.json")]),
+        .executableTarget(name: "solvr-distill", dependencies: ["SolvrCore"]),
         .testTarget(name: "SolvrCoreTests", dependencies: ["SolvrCore"]),
     ]
 )
