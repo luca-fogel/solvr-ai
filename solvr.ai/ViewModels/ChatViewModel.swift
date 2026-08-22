@@ -1,4 +1,5 @@
 import SwiftUI
+import SolvrCore
 
 @Observable
 final class ChatViewModel {
@@ -6,7 +7,7 @@ final class ChatViewModel {
     var messages: [ChatMessage] = []
     var inputText: String = ""
     var isLoading: Bool = false
-    var errorMessage: ClaudeAPIManager.ClaudeError?
+    var errorMessage: SolverError?
     
     private var problemContext: String = ""
     private let api = ClaudeAPIManager.shared
@@ -49,7 +50,7 @@ final class ChatViewModel {
             }
         } catch {
             await MainActor.run {
-                errorMessage = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                errorMessage = (error as? SolverError) ?? .apiError(error.localizedDescription)
                 isLoading = false
             }
         }

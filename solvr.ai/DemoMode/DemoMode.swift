@@ -73,7 +73,7 @@ enum DemoMode {
     /// raw unescaped backslashes a model actually sends.
     static func decode<T: Decodable>(_ type: T.Type, from json: String, label: String) throws -> T {
         guard let decoded = LLMJSON.decode(type, from: json) else {
-            throw ClaudeAPIManager.ClaudeError.decodingFailed(
+            throw SolverError.decodingFailed(
                 context: "demo fixture '\(label)' failed to parse")
         }
         return decoded.value

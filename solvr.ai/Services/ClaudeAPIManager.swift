@@ -28,12 +28,6 @@ final class ClaudeAPIManager {
         return stored > 0 ? stored : 2048
     }
 
-    var isLoadingLesson = false
-    var isLoadingFormulas = false
-    var isLoadingSteps = false
-    var isLoadingVideos = false
-    var isLoadingChat = false
-
     private var apiKey: String? {
         KeychainManager.retrieve()
     }
@@ -49,8 +43,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
         }
-        isLoadingLesson = true
-        defer { isLoadingLesson = false }
 
         let prompt = """
         You are a world-class math tutor. The student submitted this problem: '\(problem)'.
@@ -92,8 +84,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
         }
-        isLoadingLesson = true
-        defer { isLoadingLesson = false }
 
         let prompt = """
         You are a world-class math tutor. Look at the math problem in this image.
@@ -133,7 +123,7 @@ final class ClaudeAPIManager {
     private func decodeLessonJSON(from raw: String) throws -> LessonContent {
         let body = LLMJSON.sliceJSONBody(raw, shape: .object)
         guard let decoded = LLMJSON.decode(LessonContent.self, from: body) else {
-            throw ClaudeError.decodingFailed(context: "lesson: could not parse response")
+            throw SolverError.decodingFailed(context: "lesson: could not parse response")
         }
         if decoded.provenance != .strict {
             // Worth logging: a lesson that needed rescuing is a prompt problem,
@@ -150,8 +140,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
         }
-        isLoadingFormulas = true
-        defer { isLoadingFormulas = false }
 
         let prompt = """
         List 3-6 key mathematical formulas relevant to this problem: '\(problem)'.
@@ -175,8 +163,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
         }
-        isLoadingFormulas = true
-        defer { isLoadingFormulas = false }
 
         let prompt = """
         Look at the math problem in this image. List 3-6 key mathematical formulas relevant to it.
@@ -202,8 +188,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
         }
-        isLoadingSteps = true
-        defer { isLoadingSteps = false }
 
         let prompt = """
         Solve this math problem step by step: '\(problem)'.
@@ -231,8 +215,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
         }
-        isLoadingSteps = true
-        defer { isLoadingSteps = false }
 
         let prompt = """
         Look at the math problem in this image. Solve it step by step.
@@ -262,8 +244,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
         }
-        isLoadingVideos = true
-        defer { isLoadingVideos = false }
 
         let prompt = """
         Suggest 4-5 specific YouTube educational videos for learning about this math topic: '\(problem)'. \
@@ -284,8 +264,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return try DemoMode.decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
         }
-        isLoadingVideos = true
-        defer { isLoadingVideos = false }
 
         let prompt = """
         Look at the math problem in this image. \
@@ -309,8 +287,6 @@ final class ClaudeAPIManager {
             await DemoMode.pause()
             return DemoFixtures.chatReply
         }
-        isLoadingChat = true
-        defer { isLoadingChat = false }
 
         let systemPrompt = """
         You are a friendly, patient math tutor. The student is working on this problem: '\(problemContext)'. \
@@ -376,7 +352,7 @@ final class ClaudeAPIManager {
         do {
             return try JSONDecoder().decode([DetectedProblem].self, from: data)
         } catch {
-            throw ClaudeError.decodingFailed(context: "problem detection")
+            throw SolverError.decodingFailed(context: "problem detection")
         }
     }
 
@@ -438,7 +414,7 @@ final class ClaudeAPIManager {
             let result = try await performImageRequest(image, prompt: prompt)
             await requestQueue.release()
             return result
-        } catch let error as ClaudeError {
+        } catch let error as SolverError {
             if case .rateLimited(let retryAfter) = error {
                 let delay = retryAfter ?? 5.0
                 try? await Task.sleep(for: .seconds(delay))
@@ -461,13 +437,13 @@ final class ClaudeAPIManager {
 
     private func performImageRequest(_ image: UIImage, prompt: String) async throws -> String {
         guard NetworkMonitor.shared.isConnected else {
-            throw ClaudeError.networkUnavailable
+            throw SolverError.networkUnavailable
         }
         guard let apiKey = apiKey, !apiKey.isEmpty else {
-            throw ClaudeError.noAPIKey
+            throw SolverError.noAPIKey
         }
         guard let base64 = imageBase64(image) else {
-            throw ClaudeError.invalidResponse
+            throw SolverError.invalidResponse
         }
 
         var request = URLRequest(url: baseURL)
@@ -497,16 +473,16 @@ final class ClaudeAPIManager {
         } catch let urlError as URLError {
             switch urlError.code {
             case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
-                throw ClaudeError.networkUnavailable
+                throw SolverError.networkUnavailable
             case .timedOut:
-                throw ClaudeError.timeout
+                throw SolverError.timeout
             default:
-                throw ClaudeError.apiError(urlError.localizedDescription)
+                throw SolverError.apiError(urlError.localizedDescription)
             }
         }
 
         guard let http = httpResponse as? HTTPURLResponse else {
-            throw ClaudeError.invalidResponse
+            throw SolverError.invalidResponse
         }
 
         guard http.statusCode == 200 else {
@@ -514,21 +490,21 @@ final class ClaudeAPIManager {
             print("[ClaudeAPI] Image HTTP \(http.statusCode): \(bodyString)")
 
             switch http.statusCode {
-            case 401: throw ClaudeError.unauthorized
+            case 401: throw SolverError.unauthorized
             case 429:
                 let retryAfter = http.value(forHTTPHeaderField: "retry-after").flatMap { TimeInterval($0) }
-                throw ClaudeError.rateLimited(retryAfter: retryAfter)
-            case 500...599: throw ClaudeError.serverError(statusCode: http.statusCode)
+                throw SolverError.rateLimited(retryAfter: retryAfter)
+            case 500...599: throw SolverError.serverError(statusCode: http.statusCode)
             default:
                 let apiResponse = try? JSONDecoder().decode(ClaudeAPIResponse.self, from: data)
                 let msg = apiResponse?.error?.message ?? "Status \(http.statusCode)"
-                throw ClaudeError.apiError(msg)
+                throw SolverError.apiError(msg)
             }
         }
 
         let apiResponse = try JSONDecoder().decode(ClaudeAPIResponse.self, from: data)
         guard let text = apiResponse.text else {
-            throw ClaudeError.emptyResponse
+            throw SolverError.emptyResponse
         }
         return text
     }
@@ -553,7 +529,7 @@ final class ClaudeAPIManager {
             return fallback
         }
 
-        throw ClaudeError.decodingFailed(context: "\(context): could not parse response")
+        throw SolverError.decodingFailed(context: "\(context): could not parse response")
     }
 
     private func wrapPlainTextFallback<T: Decodable>(_ text: String, context: String, type: T.Type) -> T? {
@@ -599,7 +575,7 @@ final class ClaudeAPIManager {
         try await requestQueue.withSlot {
             do {
                 return try await self.performRequest(messages, system: system)
-            } catch let error as ClaudeError {
+            } catch let error as SolverError {
                 guard case .rateLimited(let retryAfter) = error else { throw error }
                 // Cancellation propagates here rather than being swallowed by
                 // `try?`: a user who has left the screen should stop the retry.
@@ -611,11 +587,11 @@ final class ClaudeAPIManager {
 
     private func performRequest(_ messages: [ClaudeMessage], system: String? = nil) async throws -> String {
         guard NetworkMonitor.shared.isConnected else {
-            throw ClaudeError.networkUnavailable
+            throw SolverError.networkUnavailable
         }
 
         guard let apiKey = apiKey, !apiKey.isEmpty else {
-            throw ClaudeError.noAPIKey
+            throw SolverError.noAPIKey
         }
 
         var request = URLRequest(url: baseURL)
@@ -635,16 +611,16 @@ final class ClaudeAPIManager {
         } catch let urlError as URLError {
             switch urlError.code {
             case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed:
-                throw ClaudeError.networkUnavailable
+                throw SolverError.networkUnavailable
             case .timedOut:
-                throw ClaudeError.timeout
+                throw SolverError.timeout
             default:
-                throw ClaudeError.apiError(urlError.localizedDescription)
+                throw SolverError.apiError(urlError.localizedDescription)
             }
         }
 
         guard let http = httpResponse as? HTTPURLResponse else {
-            throw ClaudeError.invalidResponse
+            throw SolverError.invalidResponse
         }
 
         guard http.statusCode == 200 else {
@@ -653,105 +629,27 @@ final class ClaudeAPIManager {
 
             switch http.statusCode {
             case 401:
-                throw ClaudeError.unauthorized
+                throw SolverError.unauthorized
             case 429:
                 let retryAfter = http.value(forHTTPHeaderField: "retry-after")
                     .flatMap { TimeInterval($0) }
-                throw ClaudeError.rateLimited(retryAfter: retryAfter)
+                throw SolverError.rateLimited(retryAfter: retryAfter)
             case 500...599:
-                throw ClaudeError.serverError(statusCode: http.statusCode)
+                throw SolverError.serverError(statusCode: http.statusCode)
             default:
                 let apiResponse = try? JSONDecoder().decode(ClaudeAPIResponse.self, from: data)
                 let msg = apiResponse?.error?.message ?? "Status \(http.statusCode)"
-                throw ClaudeError.apiError(msg)
+                throw SolverError.apiError(msg)
             }
         }
 
         let apiResponse = try JSONDecoder().decode(ClaudeAPIResponse.self, from: data)
 
         guard let text = apiResponse.text else {
-            throw ClaudeError.emptyResponse
+            throw SolverError.emptyResponse
         }
 
         return text
     }
 
-    // MARK: - Errors
-
-    enum ClaudeError: LocalizedError, Equatable {
-        case noAPIKey
-        case invalidResponse
-        case apiError(String)
-        case emptyResponse
-        case networkUnavailable
-        case timeout
-        case rateLimited(retryAfter: TimeInterval?)
-        case unauthorized
-        case serverError(statusCode: Int)
-        case decodingFailed(context: String)
-
-        var errorDescription: String? {
-            switch self {
-            case .noAPIKey:
-                return "No API key found. Please add your Anthropic API key in Settings."
-            case .invalidResponse:
-                return "Received an invalid response from the server."
-            case .apiError(let message):
-                return "API Error: \(message)"
-            case .emptyResponse:
-                return "Received an empty response."
-            case .networkUnavailable:
-                return "No internet connection. Please check your network and try again."
-            case .timeout:
-                return "The request timed out. Please try again."
-            case .rateLimited:
-                return "Too many requests. Please wait a moment and try again."
-            case .unauthorized:
-                return "Invalid API key. Please check your key in Settings."
-            case .serverError(let statusCode):
-                return "Server error (\(statusCode)). Please try again later."
-            case .decodingFailed(let context):
-                let label = context.components(separatedBy: ":").first ?? context
-                return "Could not parse \(label). The AI response was in an unexpected format. Try again."
-            }
-        }
-
-        var debugDetail: String? {
-            switch self {
-            case .decodingFailed(let context) where context.contains(":"):
-                return String(context.dropFirst((context.components(separatedBy: ":").first?.count ?? 0) + 2))
-            case .apiError(let message):
-                return message
-            default:
-                return nil
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .noAPIKey, .unauthorized: return "key.slash.fill"
-            case .networkUnavailable: return "wifi.slash"
-            case .timeout: return "clock.badge.exclamationmark"
-            case .rateLimited: return "gauge.with.dots.needle.67percent"
-            case .serverError: return "server.rack"
-            case .decodingFailed: return "doc.questionmark.fill"
-            default: return "exclamationmark.triangle.fill"
-            }
-        }
-
-        var title: String {
-            switch self {
-            case .noAPIKey: return "API Key Missing"
-            case .unauthorized: return "Invalid API Key"
-            case .networkUnavailable: return "You're Offline"
-            case .timeout: return "Request Timed Out"
-            case .rateLimited: return "Too Many Requests"
-            case .serverError: return "Server Error"
-            case .decodingFailed: return "Parsing Error"
-            case .invalidResponse: return "Invalid Response"
-            case .apiError: return "API Error"
-            case .emptyResponse: return "Empty Response"
-            }
-        }
-    }
 }

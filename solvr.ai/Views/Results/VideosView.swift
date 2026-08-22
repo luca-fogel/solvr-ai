@@ -1,8 +1,9 @@
 import SwiftUI
+import SolvrCore
 
 struct VideosView: View {
     let videos: [VideoItem]?
-    let error: ClaudeAPIManager.ClaudeError?
+    let error: SolverError?
     let isLoading: Bool
     var onRetry: (() -> Void)?
 

@@ -1,8 +1,9 @@
 import SwiftUI
+import SolvrCore
 
 struct LessonView: View {
     let lesson: LessonContent?
-    let error: ClaudeAPIManager.ClaudeError?
+    let error: SolverError?
     let isLoading: Bool
     var onRetry: (() -> Void)?
 
@@ -45,7 +46,7 @@ struct LessonView: View {
 // MARK: - Error Card
 
 struct ErrorCard: View {
-    let error: ClaudeAPIManager.ClaudeError
+    let error: SolverError
     var onRetry: (() -> Void)?
 
     var body: some View {

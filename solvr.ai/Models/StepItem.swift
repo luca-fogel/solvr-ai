@@ -1,7 +1,17 @@
 import Foundation
 
 struct StepItem: Codable, Identifiable {
-    var id: Int { step }
+    /// Derived from the content, not from `step`.
+    ///
+    /// This was `step`, which is the number the model chose. A model that emits
+    /// two steps numbered 3 -- and a small local model will -- gives `ForEach`
+    /// two rows with the same identity, and SwiftUI renders one of them or
+    /// neither. Deriving identity from the content instead means duplicate
+    /// numbering is merely wrong on screen rather than structurally broken, and
+    /// unlike a stored `UUID` it stays stable when the same steps are re-decoded
+    /// from history. Two steps identical in number, title and working still
+    /// collide, but at that point they are the same step.
+    var id: String { "\(step)|\(title)|\(math ?? "")" }
     let step: Int
     let title: String
     let explanation: String

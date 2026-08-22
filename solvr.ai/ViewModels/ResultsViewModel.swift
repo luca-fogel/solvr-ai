@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import SolvrCore
 
 @Observable
 final class ResultsViewModel {
@@ -11,10 +12,10 @@ final class ResultsViewModel {
     var videos: [VideoItem]?
 
     // MARK: - API errors
-    var lessonError: ClaudeAPIManager.ClaudeError?
-    var stepsError: ClaudeAPIManager.ClaudeError?
-    var formulasError: ClaudeAPIManager.ClaudeError?
-    var videosError: ClaudeAPIManager.ClaudeError?
+    var lessonError: SolverError?
+    var stepsError: SolverError?
+    var formulasError: SolverError?
+    var videosError: SolverError?
 
     var selectedTab: ResultTab = .steps
     var showConfetti: Bool = false
@@ -27,10 +28,15 @@ final class ResultsViewModel {
 
     private let api = ClaudeAPIManager.shared
 
-    var isLoadingLesson: Bool { api.isLoadingLesson }
-    var isLoadingSteps: Bool { api.isLoadingSteps }
-    var isLoadingFormulas: Bool { api.isLoadingFormulas }
-    var isLoadingVideos: Bool { api.isLoadingVideos }
+    // Owned here, not read off the provider. Four fetches run concurrently, and
+    // while there was exactly one backend it was harmless for them to share five
+    // booleans on a singleton. With more than one provider -- and one of them
+    // serving a single request at a time -- loading state belongs to the screen
+    // that displays it, not to whatever answered.
+    var isLoadingLesson = false
+    var isLoadingSteps = false
+    var isLoadingFormulas = false
+    var isLoadingVideos = false
 
     var isLoadingAny: Bool {
         isLoadingLesson || isLoadingSteps || isLoadingFormulas || isLoadingVideos
@@ -90,45 +96,53 @@ final class ResultsViewModel {
     // MARK: - Text fetchers
 
     private func fetchLesson(_ problem: String) async {
+        isLoadingLesson = true
+        defer { isLoadingLesson = false }
         do {
             let result = try await api.fetchLesson(for: problem)
             await MainActor.run { lesson = result }
         } catch {
             await MainActor.run {
-                lessonError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                lessonError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
 
     private func fetchSteps(_ problem: String) async {
+        isLoadingSteps = true
+        defer { isLoadingSteps = false }
         do {
             let result = try await api.fetchSteps(for: problem)
             await MainActor.run { steps = result }
         } catch {
             await MainActor.run {
-                stepsError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                stepsError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
 
     private func fetchFormulas(_ problem: String) async {
+        isLoadingFormulas = true
+        defer { isLoadingFormulas = false }
         do {
             let result = try await api.fetchFormulas(for: problem)
             await MainActor.run { formulas = result }
         } catch {
             await MainActor.run {
-                formulasError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                formulasError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
 
     private func fetchVideos(_ problem: String) async {
+        isLoadingVideos = true
+        defer { isLoadingVideos = false }
         do {
             let result = try await api.fetchVideos(for: problem)
             await MainActor.run { videos = result }
         } catch {
             await MainActor.run {
-                videosError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                videosError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
@@ -136,45 +150,53 @@ final class ResultsViewModel {
     // MARK: - Image fetchers
 
     private func fetchLessonFromImage(_ image: UIImage) async {
+        isLoadingLesson = true
+        defer { isLoadingLesson = false }
         do {
             let result = try await api.fetchLessonFromImage(image)
             await MainActor.run { lesson = result }
         } catch {
             await MainActor.run {
-                lessonError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                lessonError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
 
     private func fetchStepsFromImage(_ image: UIImage) async {
+        isLoadingSteps = true
+        defer { isLoadingSteps = false }
         do {
             let result = try await api.fetchStepsFromImage(image)
             await MainActor.run { steps = result }
         } catch {
             await MainActor.run {
-                stepsError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                stepsError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
 
     private func fetchFormulasFromImage(_ image: UIImage) async {
+        isLoadingFormulas = true
+        defer { isLoadingFormulas = false }
         do {
             let result = try await api.fetchFormulasFromImage(image)
             await MainActor.run { formulas = result }
         } catch {
             await MainActor.run {
-                formulasError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                formulasError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }
 
     private func fetchVideosFromImage(_ image: UIImage) async {
+        isLoadingVideos = true
+        defer { isLoadingVideos = false }
         do {
             let result = try await api.fetchVideosFromImage(image)
             await MainActor.run { videos = result }
         } catch {
             await MainActor.run {
-                videosError = (error as? ClaudeAPIManager.ClaudeError) ?? .apiError(error.localizedDescription)
+                videosError = (error as? SolverError) ?? .apiError(error.localizedDescription)
             }
         }
     }

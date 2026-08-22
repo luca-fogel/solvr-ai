@@ -1,8 +1,9 @@
 import SwiftUI
+import SolvrCore
 
 struct StepByStepView: View {
     let steps: [StepItem]?
-    let error: ClaudeAPIManager.ClaudeError?
+    let error: SolverError?
     let isLoading: Bool
     var onRetry: (() -> Void)?
 

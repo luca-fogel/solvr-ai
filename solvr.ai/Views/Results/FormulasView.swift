@@ -1,8 +1,9 @@
 import SwiftUI
+import SolvrCore
 
 struct FormulasView: View {
     let formulas: [FormulaItem]?
-    let error: ClaudeAPIManager.ClaudeError?
+    let error: SolverError?
     let isLoading: Bool
     var onRetry: (() -> Void)?
 

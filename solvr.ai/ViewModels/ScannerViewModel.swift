@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import SolvrCore
 
 enum ScannerState: Equatable {
     case camera
@@ -62,7 +63,7 @@ final class ScannerViewModel {
                 }
             } catch {
                 await MainActor.run {
-                    let claudeError = error as? ClaudeAPIManager.ClaudeError
+                    let claudeError = error as? SolverError
                     errorMessage = claudeError?.errorDescription ?? error.localizedDescription
                     state = .camera
                     Haptics.medium()
