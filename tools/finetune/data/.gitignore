@@ -1,0 +1,3 @@
+# Training data is generated, large, and must be regenerated rather than trusted
+# from a checkout. The generator and the config are what belong in git.
+*.jsonl

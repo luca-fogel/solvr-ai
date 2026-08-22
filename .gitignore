@@ -39,3 +39,6 @@ Secrets.plist
 # Evaluation runs (raw results are large and machine-specific)
 eval-*.jsonl
 *.graded.jsonl
+
+# Fine-tune build products (adapters and fused models are regenerated, not shared)
+tools/finetune/adapters/
