@@ -1,3 +1,12 @@
+//  solvr.ai -- step-by-step maths solutions and lesson plans from a photo.
+//  Copyright (C) 2026 Luca Fogel Robion
+//
+//  This program is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU General Public License as published by the Free Software
+//  Foundation, either version 3 of the License, or (at your option) any later
+//  version. It is distributed WITHOUT ANY WARRANTY; see the GNU General Public
+//  License for more details: <https://www.gnu.org/licenses/>.
+
 import SwiftUI
 import SwiftData
 
@@ -77,6 +86,35 @@ struct ContentView: View {
                     }
                 }
                 .transition(.opacity)
+            }
+        }
+        .task { await openDemoScreenIfRequested() }
+    }
+
+    /// Jump straight to one screen, populated with demo data, when launched with
+    /// `-SolvrDemo YES -SolvrScreen <name>`. Used by tools/screenshots.sh.
+    private func openDemoScreenIfRequested() async {
+        guard let screen = DemoMode.screen else { return }
+        showSplash = false
+
+        switch screen {
+        case .home:
+            return
+        case .settings:
+            showSettings = true
+        case .history:
+            // History needs something in it to be worth a screenshot.
+            DemoSeed.seedHistory(into: modelContext)
+            showHistory = true
+        case .steps, .lesson, .formulas, .videos, .chat:
+            homeVM.problemText = DemoFixtures.problem
+            solve(DemoFixtures.problem)
+            // Let the fixtures land before switching tab, so the shot shows
+            // content rather than a shimmer.
+            try? await Task.sleep(for: .milliseconds(1400))
+            resultsVM.selectedTab = ResultTab(rawValue: screen.tabIndex) ?? .steps
+            if screen == .chat {
+                chatVM.seedDemoConversation()
             }
         }
     }

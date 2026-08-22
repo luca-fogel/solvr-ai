@@ -1,4 +1,5 @@
 import Foundation
+import SolvrCore
 
 enum HTMLBuilder {
 
@@ -272,10 +273,11 @@ enum HTMLBuilder {
 
     // MARK: - Helpers
 
+    /// Model output is untrusted text and lands inside a web view, so it is
+    /// escaped by `SolvrCore.LLMJSON.escapeHTML` -- one implementation, covered
+    /// by tests, rather than a second copy here that quietly forgets quotes.
     private static func escapeHTML(_ text: String) -> String {
-        text.replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
+        LLMJSON.escapeHTML(text)
     }
 
     /// Preserves LaTeX backslashes for KaTeX while the surrounding text is HTML-escaped.

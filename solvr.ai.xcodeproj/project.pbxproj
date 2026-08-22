@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AA0000010000000000000003 /* SolvrCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000010000000000000002 /* SolvrCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		228F7E8E2F75D99C008C2370 /* solvr.ai.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = solvr.ai.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA0000010000000000000003 /* SolvrCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = solvr.ai;
 			packageProductDependencies = (
+				AA0000010000000000000002 /* SolvrCore */,
 			);
 			productName = solvr.ai;
 			productReference = 228F7E8E2F75D99C008C2370 /* solvr.ai.app */;
@@ -95,6 +101,9 @@
 			mainGroup = 228F7E852F75D99C008C2370;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				AA0000010000000000000001 /* XCLocalSwiftPackageReference "Packages/SolvrCore" */,
+			);
 			productRefGroup = 228F7E8F2F75D99C008C2370 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -251,7 +260,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WBQ34386W3;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "solvr.ai uses the camera to scan math problems from paper or a whiteboard.";
@@ -271,7 +280,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "Lulu.solvr-ai";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -290,7 +299,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WBQ34386W3;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "solvr.ai uses the camera to scan math problems from paper or a whiteboard.";
@@ -310,7 +319,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "Lulu.solvr-ai";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = YES;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -323,6 +332,20 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA0000010000000000000001 /* XCLocalSwiftPackageReference "Packages/SolvrCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/SolvrCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA0000010000000000000002 /* SolvrCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SolvrCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		228F7E892F75D99C008C2370 /* Build configuration list for PBXProject "solvr.ai" */ = {

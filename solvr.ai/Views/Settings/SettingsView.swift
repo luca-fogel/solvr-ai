@@ -8,9 +8,11 @@ struct SettingsView: View {
     @State private var apiKey: String = ""
     @State private var showAPIKey = false
     @State private var saveSuccess = false
+    @State private var saveFailed = false
     @State private var showClearConfirm = false
     @AppStorage("selectedModel") private var selectedModel: String = "claude-sonnet-4-6"
     @AppStorage("maxTokens") private var maxTokens: Int = 2048
+    @AppStorage(DemoMode.defaultsKey) private var demoMode: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -43,24 +45,53 @@ struct SettingsView: View {
                     }
 
                     Button {
+                        // A failed save has to be visible. The Keychain is the
+                        // only place the key is kept, so "it did not save" means
+                        // the app cannot work -- silently doing nothing here
+                        // left people staring at a button that appeared broken.
                         if KeychainManager.save(apiKey: apiKey) {
                             saveSuccess = true
+                            saveFailed = false
                             Haptics.success()
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                 saveSuccess = false
                             }
+                        } else {
+                            saveFailed = true
+                            saveSuccess = false
                         }
                     } label: {
                         HStack {
-                            Image(systemName: saveSuccess ? "checkmark.circle.fill" : "key.fill")
-                            Text(saveSuccess ? "Saved" : "Save API Key")
+                            Image(systemName: saveSuccess ? "checkmark.circle.fill"
+                                  : saveFailed ? "exclamationmark.triangle.fill" : "key.fill")
+                            Text(saveSuccess ? "Saved" : saveFailed ? "Could not save" : "Save API Key")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundStyle(saveSuccess ? Theme.Colors.success : Theme.Colors.accent)
+                        .foregroundStyle(saveSuccess ? Theme.Colors.success
+                                         : saveFailed ? Theme.Colors.error : Theme.Colors.accent)
+                    }
+
+                    if saveFailed {
+                        Text("The key could not be written to the Keychain, so it has not "
+                             + "been stored anywhere. It is never kept in plain text as a "
+                             + "fallback. Try again, or restart the app.")
+                            .font(Theme.Fonts.caption)
+                            .foregroundStyle(Theme.Colors.error)
                     }
                 }
 
                 // Model
+                Section {
+                    Toggle("Demo mode", isOn: $demoMode)
+                    Text("Answers come from bundled sample data instead of the API. "
+                         + "No key needed, nothing leaves the device, and every "
+                         + "problem shown is synthetic.")
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                } header: {
+                    Text("Try it without a key")
+                }
+
                 Section("Model") {
                     Picker("Model", selection: $selectedModel) {
                         Text("Claude Opus 4.6").tag("claude-opus-4-6")

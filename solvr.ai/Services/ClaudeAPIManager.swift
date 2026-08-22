@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SolvrCore
 
 @Observable
 final class ClaudeAPIManager {
@@ -44,6 +45,10 @@ final class ClaudeAPIManager {
     // MARK: - Lesson (JSON)
 
     func fetchLesson(for problem: String) async throws -> LessonContent {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
+        }
         isLoadingLesson = true
         defer { isLoadingLesson = false }
 
@@ -83,6 +88,10 @@ final class ClaudeAPIManager {
     }
 
     func fetchLessonFromImage(_ image: UIImage) async throws -> LessonContent {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
+        }
         isLoadingLesson = true
         defer { isLoadingLesson = false }
 
@@ -122,53 +131,25 @@ final class ClaudeAPIManager {
     }
 
     private func decodeLessonJSON(from raw: String) throws -> LessonContent {
-        print("[ClaudeAPI] Raw lesson response (\(raw.count) chars)")
-
-        let cleaned = cleanLaTeXJSON(raw)
-
-        // Extract JSON object
-        var jsonStr = cleaned
-        if let startIdx = jsonStr.firstIndex(of: "{"),
-           let endIdx = jsonStr.lastIndex(of: "}") {
-            jsonStr = String(jsonStr[startIdx...endIdx])
+        let body = LLMJSON.sliceJSONBody(raw, shape: .object)
+        guard let decoded = LLMJSON.decode(LessonContent.self, from: body) else {
+            throw ClaudeError.decodingFailed(context: "lesson: could not parse response")
         }
-
-        // Attempt 1: Direct decode
-        do {
-            let data = Data(jsonStr.utf8)
-            let result = try JSONDecoder().decode(LessonContent.self, from: data)
-            print("[ClaudeAPI] Decoded lesson on first attempt")
-            return result
-        } catch {
-            print("[ClaudeAPI] Lesson attempt 1 failed: \(error.localizedDescription)")
+        if decoded.provenance != .strict {
+            // Worth logging: a lesson that needed rescuing is a prompt problem,
+            // and the prompt is the thing to fix.
+            print("[ClaudeAPI] lesson parsed via \(decoded.provenance.rawValue)")
         }
-
-        // Attempt 2: Repair LaTeX backslashes
-        let repaired = repairLaTeXJSON(jsonStr)
-        do {
-            let data = Data(repaired.utf8)
-            let result = try JSONDecoder().decode(LessonContent.self, from: data)
-            print("[ClaudeAPI] Decoded lesson after LaTeX repair")
-            return result
-        } catch {
-            print("[ClaudeAPI] Lesson attempt 2 (repair) failed: \(error.localizedDescription)")
-        }
-
-        // Attempt 3: JSONSerialization roundtrip
-        if let data = repaired.data(using: .utf8),
-           let jsonObj = try? JSONSerialization.jsonObject(with: data),
-           let reEncoded = try? JSONSerialization.data(withJSONObject: jsonObj),
-           let result = try? JSONDecoder().decode(LessonContent.self, from: reEncoded) {
-            print("[ClaudeAPI] Decoded lesson via JSONSerialization roundtrip")
-            return result
-        }
-
-        throw ClaudeError.decodingFailed(context: "lesson: could not parse response")
+        return decoded.value
     }
 
     // MARK: - Formulas (JSON)
 
     func fetchFormulas(for problem: String) async throws -> [FormulaItem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
+        }
         isLoadingFormulas = true
         defer { isLoadingFormulas = false }
 
@@ -190,6 +171,10 @@ final class ClaudeAPIManager {
     }
 
     func fetchFormulasFromImage(_ image: UIImage) async throws -> [FormulaItem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
+        }
         isLoadingFormulas = true
         defer { isLoadingFormulas = false }
 
@@ -213,6 +198,10 @@ final class ClaudeAPIManager {
     // MARK: - Step-by-Step (JSON)
 
     func fetchSteps(for problem: String) async throws -> [StepItem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
+        }
         isLoadingSteps = true
         defer { isLoadingSteps = false }
 
@@ -238,6 +227,10 @@ final class ClaudeAPIManager {
     }
 
     func fetchStepsFromImage(_ image: UIImage) async throws -> [StepItem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
+        }
         isLoadingSteps = true
         defer { isLoadingSteps = false }
 
@@ -265,6 +258,10 @@ final class ClaudeAPIManager {
     // MARK: - Videos
 
     func fetchVideos(for problem: String) async throws -> [VideoItem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
+        }
         isLoadingVideos = true
         defer { isLoadingVideos = false }
 
@@ -283,6 +280,10 @@ final class ClaudeAPIManager {
     }
 
     func fetchVideosFromImage(_ image: UIImage) async throws -> [VideoItem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
+        }
         isLoadingVideos = true
         defer { isLoadingVideos = false }
 
@@ -304,6 +305,10 @@ final class ClaudeAPIManager {
     // MARK: - Chat
 
     func sendChatMessage(_ message: String, problemContext: String, history: [ChatMessage]) async throws -> String {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return DemoFixtures.chatReply
+        }
         isLoadingChat = true
         defer { isLoadingChat = false }
 
@@ -327,6 +332,10 @@ final class ClaudeAPIManager {
     // MARK: - Problem Detection (Claude Vision)
 
     func detectProblems(in image: UIImage) async throws -> [DetectedProblem] {
+        if DemoMode.isEnabled {
+            await DemoMode.pause()
+            return try DemoMode.decode([DetectedProblem].self, from: DemoFixtures.detectedProblems, label: "detection")
+        }
         let prompt = """
         You are analyzing a photo taken of a computer screen displaying a math document (PDF, webpage, or document viewer).
 
@@ -374,6 +383,7 @@ final class ClaudeAPIManager {
     // MARK: - Problem Title from Image
 
     func generateProblemTitle(from image: UIImage) async -> String {
+        if DemoMode.isEnabled { return DemoFixtures.title }
         do {
             let prompt = """
             Look at this math problem image. Respond with ONLY a 3-5 word title summarizing what the problem is about. Examples: "Surface Area Integral", "Curl of Vector Field", "Quadratic Factoring", "Taylor Series Expansion", "Double Integral Polar".
@@ -393,6 +403,7 @@ final class ClaudeAPIManager {
     }
 
     func generateProblemTitle(from text: String) async -> String {
+        if DemoMode.isEnabled { return DemoFixtures.title }
         do {
             let prompt = """
             Here is a math problem: '\(text)'
@@ -525,47 +536,20 @@ final class ClaudeAPIManager {
     // MARK: - JSON Decoding Helper
 
     private func decodeJSON<T: Decodable>(_ type: T.Type, from raw: String, context: String) throws -> T {
-        print("[ClaudeAPI] Raw \(context) response (\(raw.count) chars)")
+        let body = LLMJSON.sliceJSONBody(raw, shape: .array)
 
-        let cleaned = cleanLaTeXJSON(raw)
-
-        // Extract JSON array
-        var jsonStr = cleaned
-        if let startIdx = jsonStr.firstIndex(of: "["),
-           let endIdx = jsonStr.lastIndex(of: "]") {
-            jsonStr = String(jsonStr[startIdx...endIdx])
+        if let decoded = LLMJSON.decode(type, from: body) {
+            if decoded.provenance != .strict {
+                print("[ClaudeAPI] \(context) parsed via \(decoded.provenance.rawValue)")
+            }
+            return decoded.value
         }
 
-        // Attempt 1: Direct decode
-        do {
-            let data = Data(jsonStr.utf8)
-            let result = try JSONDecoder().decode(T.self, from: data)
-            print("[ClaudeAPI] Decoded \(context) on first attempt")
-            return result
-        } catch {
-            print("[ClaudeAPI] Attempt 1 failed for \(context): \(error.localizedDescription)")
-        }
-
-        // Attempt 2: Repair LaTeX backslashes then decode
-        let repaired = repairLaTeXJSON(jsonStr)
-        do {
-            let data = Data(repaired.utf8)
-            let result = try JSONDecoder().decode(T.self, from: data)
-            print("[ClaudeAPI] Decoded \(context) after LaTeX repair")
-            return result
-        } catch {
-            print("[ClaudeAPI] Attempt 2 (repair) failed for \(context): \(error.localizedDescription)")
-        }
-
-        // Attempt 3: Lenient array parsing via JSONSerialization roundtrip
-        if let result = tryLenientArrayDecode(type, from: repaired, context: context) {
-            print("[ClaudeAPI] Decoded \(context) with lenient parsing")
-            return result
-        }
-
-        // Attempt 4: Plain text fallback
-        if let fallback = wrapPlainTextFallback(cleaned, context: context, type: type) {
-            print("[ClaudeAPI] Used plain text fallback for \(context)")
+        // Last resort: the model answered in prose. Show what it said rather
+        // than an error, wrapped in the shape this tab expects.
+        if let fallback = wrapPlainTextFallback(LLMJSON.stripCodeFences(raw),
+                                                context: context, type: type) {
+            print("[ClaudeAPI] used plain text fallback for \(context)")
             return fallback
         }
 
@@ -600,72 +584,6 @@ final class ClaudeAPIManager {
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
-    // MARK: - JSON Cleaning & Repair
-
-    /// Strip markdown fences and trim whitespace from raw API response.
-    private func cleanLaTeXJSON(_ raw: String) -> String {
-        var cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleaned.hasPrefix("```") {
-            if let firstNewline = cleaned.firstIndex(of: "\n") {
-                cleaned = String(cleaned[cleaned.index(after: firstNewline)...])
-            } else {
-                cleaned = String(cleaned.dropFirst(3))
-            }
-        }
-        if cleaned.hasSuffix("```") {
-            cleaned = String(cleaned.dropLast(3))
-        }
-        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Fix unescaped LaTeX backslashes in JSON text.
-    /// Uses a placeholder to protect already-escaped double-backslashes,
-    /// then doubles all remaining single backslashes.
-    private func repairLaTeXJSON(_ raw: String) -> String {
-        let placeholder = "\u{FFFE}"
-        var result = raw
-        // Protect already-doubled backslashes (correct JSON escaping)
-        result = result.replacingOccurrences(of: "\\\\", with: placeholder)
-        // Double all remaining single backslashes
-        result = result.replacingOccurrences(of: "\\", with: "\\\\")
-        // Restore protected doubles
-        result = result.replacingOccurrences(of: placeholder, with: "\\\\")
-        return result
-    }
-
-    /// Try parsing a JSON array leniently via JSONSerialization roundtrip.
-    /// Falls back to nullifying math/formula fields if individual items fail.
-    private func tryLenientArrayDecode<T: Decodable>(_ type: T.Type, from raw: String, context: String) -> T? {
-        guard let data = raw.data(using: .utf8),
-              let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return nil
-        }
-
-        // Roundtrip through JSONSerialization (normalizes escaping)
-        if let arrayData = try? JSONSerialization.data(withJSONObject: jsonArray),
-           let result = try? JSONDecoder().decode(T.self, from: arrayData) {
-            return result
-        }
-
-        // Null out problematic LaTeX fields and try again
-        var cleanedItems: [[String: Any]] = []
-        for var item in jsonArray {
-            if context == "steps" {
-                item["math"] = NSNull()
-            } else if context == "formulas" {
-                item["formula"] = ""
-            }
-            cleanedItems.append(item)
-        }
-
-        guard !cleanedItems.isEmpty,
-              let arrayData = try? JSONSerialization.data(withJSONObject: cleanedItems),
-              let result = try? JSONDecoder().decode(T.self, from: arrayData) else {
-            return nil
-        }
-        return result
-    }
-
     // MARK: - Core Networking
 
     private func sendMessage(_ content: String, system: String? = nil) async throws -> String {
@@ -674,29 +592,20 @@ final class ClaudeAPIManager {
     }
 
     private func sendMessages(_ messages: [ClaudeMessage], system: String? = nil) async throws -> String {
-        await requestQueue.acquire()
-        do {
-            let result = try await performRequest(messages, system: system)
-            await requestQueue.release()
-            return result
-        } catch let error as ClaudeError {
-            if case .rateLimited(let retryAfter) = error {
-                let delay = retryAfter ?? 5.0
-                try? await Task.sleep(for: .seconds(delay))
-                do {
-                    let result = try await performRequest(messages, system: system)
-                    await requestQueue.release()
-                    return result
-                } catch {
-                    await requestQueue.release()
-                    throw error
-                }
+        // One release, on every path, including cancellation. The previous
+        // version released at five separate call sites; a slot missed at any of
+        // them is gone for the life of the process, and after four the app stops
+        // making requests with nothing on screen to say why.
+        try await requestQueue.withSlot {
+            do {
+                return try await self.performRequest(messages, system: system)
+            } catch let error as ClaudeError {
+                guard case .rateLimited(let retryAfter) = error else { throw error }
+                // Cancellation propagates here rather than being swallowed by
+                // `try?`: a user who has left the screen should stop the retry.
+                try await Task.sleep(for: .seconds(retryAfter ?? 5.0))
+                return try await self.performRequest(messages, system: system)
             }
-            await requestQueue.release()
-            throw error
-        } catch {
-            await requestQueue.release()
-            throw error
         }
     }
 
@@ -843,37 +752,6 @@ final class ClaudeAPIManager {
             case .apiError: return "API Error"
             case .emptyResponse: return "Empty Response"
             }
-        }
-    }
-}
-
-// MARK: - Request Queue
-
-actor RequestQueue {
-    private var activeCount = 0
-    private let maxConcurrent: Int
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    init(maxConcurrent: Int) {
-        self.maxConcurrent = maxConcurrent
-    }
-
-    func acquire() async {
-        if activeCount < maxConcurrent {
-            activeCount += 1
-        } else {
-            await withCheckedContinuation { continuation in
-                waiters.append(continuation)
-            }
-        }
-    }
-
-    func release() {
-        if !waiters.isEmpty {
-            let next = waiters.removeFirst()
-            next.resume()
-        } else {
-            activeCount -= 1
         }
     }
 }

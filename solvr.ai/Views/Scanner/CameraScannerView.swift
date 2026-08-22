@@ -261,14 +261,11 @@ struct CameraScannerView: View {
         let imageH = CGFloat(cgImage.height)
 
         // Get the screen size from the crop rect's container
-        // Since aspectFill: the image is scaled up to fill, and clipped
-        let screenW = cropRect.origin.x + cropRect.width + 40 // approximate container width
-        let screenH = cropRect.origin.y + cropRect.height + 40
 
         // Recalculate using the actual container (we stored nothing, so compute from image aspect)
         // For aspectFill, one dimension fills exactly, the other overflows
-        let containerW = UIScreen.main.bounds.width
-        let containerH = UIScreen.main.bounds.height
+        let containerW = Platform.activeScreenBounds.width
+        let containerH = Platform.activeScreenBounds.height
 
         let imageAspect = imageW / imageH
         let containerAspect = containerW / containerH

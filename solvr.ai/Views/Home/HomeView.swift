@@ -377,8 +377,19 @@ struct HomeView: View {
 
     private var cameraScreen: some View {
         ZStack {
-            CameraPreviewView(session: cameraManager.session)
-                .ignoresSafeArea()
+            // Demo mode stands in a drawn page for the camera feed: a
+            // simulator has no camera, so the real preview is a black rectangle.
+            if DemoMode.isEnabled {
+                Image(uiImage: DemoPage.image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipped()
+                    .accessibilityLabel("Sample worksheet, shown because demo mode is on")
+                    .ignoresSafeArea()
+            } else {
+                CameraPreviewView(session: cameraManager.session)
+                    .ignoresSafeArea()
+            }
 
             // Vignette
             RadialGradient(
@@ -811,8 +822,8 @@ struct HomeView: View {
 
         let imageW = CGFloat(cgImage.width)
         let imageH = CGFloat(cgImage.height)
-        let containerW = UIScreen.main.bounds.width
-        let containerH = UIScreen.main.bounds.height
+        let containerW = Platform.activeScreenBounds.width
+        let containerH = Platform.activeScreenBounds.height
 
         let imageAspect = imageW / imageH
         let containerAspect = containerW / containerH
