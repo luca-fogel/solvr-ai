@@ -150,6 +150,65 @@ does not remove failure. It removes **silent** failure.
 
 See [evaluation.md](evaluation.md) for how that gets measured.
 
+## What the on-device backend actually does, measured
+
+Run on 2026-08-22 via the launch-argument self test
+(`-SolvrSelfTest YES`, report written to the app container). Apple's model is not
+present on this Mac, but the iOS 26.5 simulator reports `.available`, so the path
+is verifiable without a device.
+
+| surface | result | time |
+| --- | --- | --- |
+| steps | 4–5 steps, final answer **correct** | 7.6 s |
+| lesson | 3 sections | 6.0 s |
+| formulas | 3 formulas | 3.2 s |
+
+No string was parsed at any point, so no rung of the repair ladder was
+reachable. That is the central claim of the project, now an observation.
+
+Roughly 17 s for all three, because they serialise. Against the hosted API the
+same three run concurrently. That is the honest cost of not sending anything
+anywhere.
+
+### The interesting failure: right maths, wrong notation
+
+Asked for `\int_{0}^{1} 3x^{2}\,dx`, it returned:
+
+```
+∫[0,1] 3x^2 dx
+```
+
+Correct mathematics. Notation that renders as literal text. And the important
+part: **tightening the instructions did not fix it.** Naming the commands, giving
+worked examples, and saying "never plain text" in both the `@Guide` descriptions
+and the session instructions changed the *flavour* of the wrong answer, not its
+correctness.
+
+So on this surface the on-device model's weakness is presentation rather than
+mathematics, and prompt wording is not a strong enough lever to move it. That is
+a concrete argument for a fine-tune rather than a hypothetical one — it is exactly
+"a small model that reliably produces *my* output shape".
+
+`MathNotation` closes the part of the gap a deterministic string pass can close:
+Unicode operators to commands, bracketed integral limits to sub/superscripts,
+bare exponents braced, function names to commands. It inherits `LLMJSON`'s rule
+that a conversion may never damage input that was already correct — anything
+containing a backslash command is returned untouched — it is idempotent, and its
+tests use the strings the model actually emitted rather than invented ones. After
+it, steps render as real typeset maths.
+
+What it does **not** fix, and should not try to: the formulas surface writes the
+*word* "integral" rather than the symbol (`integral of x^{n} dx = x^{n+1}/(n+1) + C`).
+Rewriting English into notation is not something a string pass should attempt.
+Left visible, because it is the measurement that justifies the next phase.
+
+A second, smaller finding: the lesson title came back as the student's problem
+restated. Guided generation fills fields in declaration order, so `title` is now
+declared *last*, after the sections it is supposed to name. That moved it from
+"Evaluate the definite integral of 3x^2 from 0 to 1" to "Evaluating the Definite
+Integral of 3x^2 from 0 to 1", with `topic` becoming "Definite Integrals".
+Better; not fixed.
+
 ## Constraints that will shape the next backend
 
 Recorded here because they were verified against the SDK and are easy to
