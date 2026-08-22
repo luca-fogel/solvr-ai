@@ -122,7 +122,7 @@ def distill_state():
 
 
 def training_state():
-    """Loss curve, if a LoRA run has been started."""
+    """Loss curves, progress and -- importantly -- how a run ended."""
     if not TRAIN_LOG.exists():
         return {"started": False, "running": process_alive("mlx_lm.lora")}
     text = TRAIN_LOG.read_text(errors="replace")
@@ -131,11 +131,48 @@ def training_state():
     val = [(int(i), float(l)) for i, l in
            re.findall(r"Iter (\d+): Val loss ([\d.]+)", text)]
     peak = re.findall(r"Peak mem ([\d.]+) GB", text)
+    speed = re.findall(r"Tokens/sec ([\d.]+)", text)
+    trained = re.findall(r"Trained Tokens (\d+)", text)
+    target = re.search(r"Starting training\.\.\., iters: (\d+)", text)
+    trainable = re.search(r"Trainable parameters: ([\d.]+)% \(([\d.]+M)/", text)
+
+    # How it ended matters as much as where it got to. A crashed run that still
+    # shows its last loss looks like a finished one, which is exactly the sort of
+    # thing a status page should not let you believe.
+    failure = None
+    for pattern in (r"RuntimeError: (.+)", r"(\[METAL\].+)", r"(MemoryError.*)",
+                    r"(KeyboardInterrupt)"):
+        found = re.search(pattern, text)
+        if found:
+            failure = found.group(1).strip()[:180]
+            break
+
+    running = process_alive("mlx_lm.lora")
+    last_iter = max([i for i, _ in train] + [i for i, _ in val] + [0])
+    total = int(target.group(1)) if target else None
+    if running:
+        outcome = "running"
+    elif failure:
+        outcome = "crashed"
+    elif total and last_iter >= total:
+        outcome = "finished"
+    elif last_iter:
+        outcome = "stopped early"
+    else:
+        outcome = "not started"
+
     return {
         "started": True,
-        "running": process_alive("mlx_lm.lora"),
+        "running": running,
+        "outcome": outcome,
+        "failure": failure,
         "train": train, "val": val,
+        "iter": last_iter, "iters": total,
         "peakMemoryGB": float(peak[-1]) if peak else None,
+        "tokensPerSecond": float(speed[-1]) if speed else None,
+        "trainedTokens": int(trained[-1]) if trained else None,
+        "trainablePercent": trainable.group(1) if trainable else None,
+        "trainableParams": trainable.group(2) if trainable else None,
         "adapterSaved": (ADAPTERS / "adapters.safetensors").exists(),
     }
 
@@ -202,21 +239,35 @@ def terminal(state):
     out.append(f"  {label}     ${d['estimatedCost']:.2f}   "
                f"{d['tokensIn'] / 1000:.0f}k in / {d['tokensOut'] / 1000:.0f}k out")
     warn = "\033[31m" if remaining < 2 else ""
-    out.append(f"  {warn}budget left       ${remaining:.2f}\033[0m")
+    out.append(f"  {warn}budget left       ${remaining:.2f}\033[0m  "
+               f"\033[90m(list price; cache hits make the real balance higher)\033[0m")
     out.append("")
 
     # Training
-    status = "\033[32mrunning\033[0m" if t["running"] else (
-        "\033[90mnot started\033[0m" if not t["started"] else "\033[90mfinished\033[0m")
-    out.append(f"\033[1mLoRA training\033[0m ({status})")
-    if t["started"] and t["train"]:
-        first, last = t["train"][0], t["train"][-1]
-        out.append(f"  iter {last[0]}   train loss {first[1]:.3f} → {last[1]:.3f}")
+    colours = {"running": "\033[32m", "crashed": "\033[31m",
+               "finished": "\033[32m", "stopped early": "\033[33m"}
+    outcome = t.get("outcome", "not started")
+    out.append(f"\033[1mLoRA training\033[0m "
+               f"({colours.get(outcome, '\033[90m')}{outcome}\033[0m)")
+    if t["started"]:
+        if t.get("iters"):
+            out.append(f"  {bar(t['iter'], t['iters'])} iter {t['iter']}/{t['iters']}")
+        if t["train"]:
+            out.append(f"  train loss {t['train'][0][1]:.3f} → {t['train'][-1][1]:.3f}")
         if t["val"]:
-            out.append(f"  val loss {t['val'][0][1]:.3f} → {t['val'][-1][1]:.3f}")
-        if t["peakMemoryGB"]:
-            out.append(f"  peak memory {t['peakMemoryGB']:.2f} GB")
+            out.append(f"  val loss   {t['val'][0][1]:.3f} → {t['val'][-1][1]:.3f}")
+        bits = []
+        if t.get("trainablePercent"):
+            bits.append(f"{t['trainableParams']} trainable ({t['trainablePercent']}%)")
+        if t.get("peakMemoryGB"):
+            bits.append(f"peak {t['peakMemoryGB']:.2f} GB")
+        if t.get("tokensPerSecond"):
+            bits.append(f"{t['tokensPerSecond']:.0f} tok/s")
+        if bits:
+            out.append("  " + " · ".join(bits))
         out.append(f"  adapter saved: {'yes' if t['adapterSaved'] else 'not yet'}")
+        if t.get("failure"):
+            out.append(f"  \033[31m{t['failure']}\033[0m")
     out.append("")
 
     # Evaluation
@@ -311,11 +362,31 @@ def render_html(state):
       <p class='muted'>{'running — ~%d min left' % (d['eta'] // 60) if d['running'] and d['eta'] else 'idle'}</p>
       {svg_bars(sorted(d['bySurface'].items()))}"""
 
-    if t["started"] and t["train"]:
+    if t["started"]:
+        pct_iter = 100 * t["iter"] / t["iters"] if t.get("iters") else 0
+        badge = {"running": "#34C759", "crashed": "#FF3B30",
+                 "finished": "#34C759", "stopped early": "#FF9500"}.get(
+                     t.get("outcome"), "#8E8E93")
+        stats = f"""
+          <div class='row'>
+            <div class='stat'><b>{t['iter']}/{t.get('iters') or '?'}</b><span>iteration</span></div>
+            <div class='stat'><b>{t['train'][-1][1]:.3f}</b><span>train loss</span></div>
+            <div class='stat'><b>{t['val'][-1][1]:.3f}</b><span>val loss</span></div>
+            <div class='stat'><b>{(t.get('peakMemoryGB') or 0):.1f} GB</b><span>peak memory</span></div>
+          </div>""" if t["train"] and t["val"] else ""
         training_body = (
-            svg_lines([("train", t["train"]), ("validation", t["val"])])
-            + f"<p class='muted'>peak memory {t['peakMemoryGB'] or 0:.2f} GB · "
-              f"adapter {'saved' if t['adapterSaved'] else 'not yet saved'}</p>")
+            f"<p><span class='badge' style='background:{badge}'></span>"
+            f"{html.escape(t.get('outcome', ''))}</p>"
+            + stats
+            + f"<div class='track'><div class='fill' style='width:{pct_iter:.1f}%'></div></div>"
+            + svg_lines([("train", t["train"]), ("validation", t["val"])])
+            + (f"<p class='muted'>{t['trainableParams']} trainable of 4.0B "
+               f"({t['trainablePercent']}%) · "
+               f"{(t.get('tokensPerSecond') or 0):.0f} tok/s · adapter "
+               f"{'saved' if t['adapterSaved'] else 'not yet saved'}</p>"
+               if t.get("trainablePercent") else "")
+            + (f"<p class='err'>{html.escape(t['failure'])}</p>"
+               if t.get("failure") else ""))
     else:
         training_body = "<p class='muted'>not started</p>"
 
@@ -371,6 +442,11 @@ def render_html(state):
         padding-bottom:6px }}
   td {{ padding:6px 0; border-top:1px solid var(--bg); font-variant-numeric:tabular-nums }}
   .mono {{ font-family:ui-monospace,SFMono-Regular,monospace; font-size:11px }}
+  .badge {{ display:inline-block; width:8px; height:8px; border-radius:99px;
+            margin-right:7px; vertical-align:middle }}
+  .err {{ background:rgba(255,59,48,.12); color:#FF6961; border-radius:8px;
+          padding:9px 11px; font-size:12px; margin:12px 0 0;
+          font-family:ui-monospace,SFMono-Regular,monospace }}
   footer {{ color:var(--muted); font-size:11px; text-align:center; margin-top:8px }}
 </style></head><body><div class="wrap">
 <h1>Solvr — run status</h1>
@@ -380,7 +456,10 @@ def render_html(state):
       ("Spend is estimated from per-surface averages and has been wrong by 61% before — "
        "the probe it was built from sampled only the simplest problems. "
        if d["costIsEstimate"] else "Spend is the run's own token ledger, not an estimate. ")
-      + "Kimi K3 at $3/$15 per Mtok.")}
+      + "Kimi K3 at $3/$15 per Mtok. Token counts are exact; the dollar figure "
+        "applies list price to them, so it reads high whenever input was served "
+        "from cache at $0.30 rather than $3. The console balance is authoritative "
+        "\u2014 it showed $2.91 left where this said $0.79.")}
 {card("LoRA training (Qwen3-4B)", training_body)}
 {card("Evaluation", eval_body)}
 <footer>Reads the pipeline's own artefacts — no separate state to fall out of sync.</footer>
