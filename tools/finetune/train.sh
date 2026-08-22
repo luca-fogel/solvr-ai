@@ -27,7 +27,11 @@ completed() {  # cumulative across attempts -- see progress.py for why
   python3 tools/finetune/progress.py "$LOG" 2>/dev/null || echo 0
 }
 
-: > "$LOG"
+# Append rather than truncate. Truncating destroyed the record of prior progress,
+# so completed() read 0 and the script started from scratch instead of resuming --
+# silently discarding 125 iterations of adapter, twice. progress.py sums per-attempt
+# maxima, so an appended log gives the correct cumulative count across invocations.
+{ echo; echo "=== session $(date '+%Y-%m-%d %H:%M:%S') ==="; } >> "$LOG"
 for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
   DONE=$(completed); DONE=${DONE:-0}
   REMAINING=$(( TARGET - DONE ))

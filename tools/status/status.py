@@ -25,6 +25,9 @@ DISTILL_LOG = pathlib.Path("/tmp/distill-run.err")
 TRAIN_LOG = pathlib.Path("/tmp/lora-train.log")
 ADAPTERS = ROOT / "tools/finetune/adapters"
 EVAL_GLOB = "eval-*.graded.jsonl"
+# Raw (ungraded) arm outputs, in the order they run. Used for ETA only.
+EVAL_ARMS = ["eval-base", "eval-tuned", "eval-525"]
+SAMPLES = pathlib.Path("/tmp/solvr-eta-samples.json")
 
 # Kimi K3 list price, USD per million tokens.
 PRICE_IN, PRICE_OUT = 3.00, 15.00
@@ -233,6 +236,21 @@ def terminal(state):
     d, t, evals = state["distill"], state["training"], state["eval"]
     out = []
     out.append("\033[1mSOLVR — RUN STATUS\033[0m   " + time.strftime("%H:%M:%S"))
+    e = state.get("eta") or {}
+    if e.get("active"):
+        line = f"  \033[1m{e['stage']}\033[0m  {e['done']}"
+        if e.get("total"):
+            line += f"/{e['total']}"
+        line += f" {e['unit']}"
+        if e.get("rate"):
+            line += f"  ·  {e['rate']*60:.1f}/min"
+        if e.get("seconds"):
+            done_at = time.strftime("%H:%M", time.localtime(time.time() + e["seconds"]))
+            line += f"  ·  \033[1mETA {e['seconds']/60:.0f} min\033[0m (≈{done_at})"
+        elif e.get("samples", 0) < 2:
+            line += "  ·  measuring rate…"
+        out.append("")
+        out.append(line)
     out.append("")
 
     # Distillation
@@ -441,6 +459,31 @@ def render_html(state):
     distill_done = not d["running"] and d["done"] and d["done"] >= (d["total"] or 0)
     sections = []
 
+    e = state.get("eta") or {}
+    if e.get("active"):
+        pct = 100 * e["done"] / e["total"] if e.get("total") else 0
+        if e.get("seconds"):
+            mins = e["seconds"] / 60
+            eta_big = f"{mins:.0f} min" if mins >= 1 else "under a minute"
+            finish = time.strftime("%H:%M", time.localtime(time.time() + e["seconds"]))
+        else:
+            eta_big = "measuring…"
+            finish = "rate not established yet"
+        rate = f"{e['rate']*60:.1f} {e['unit']}/min" if e.get("rate") else "—"
+        sections.append(f'''<section class="eta">
+          <h2>{html.escape(e["stage"])} in progress</h2>
+          <div class="etarow">
+            <div class="etabig"><b>{eta_big}</b><span>remaining · finishes ≈{finish}</span></div>
+            <div class="stat"><b>{e["done"]}{"/" + str(e["total"]) if e.get("total") else ""}</b>
+              <span>{html.escape(e["unit"])}</span></div>
+            <div class="stat"><b>{rate}</b><span>measured rate</span></div>
+          </div>
+          <div class="track"><div class="fill" style="width:{pct:.1f}%"></div></div>
+          <p class="muted">Rate is fitted over the last few minutes of actual
+          progress, not assumed — every estimate in this project built on an
+          assumption has come out wrong.</p>
+        </section>''')
+
     if t["started"] and (t["running"] or not distill_done):
         sections.append(card("LoRA training (Qwen3-4B)", training_body))
 
@@ -512,6 +555,19 @@ def render_html(state):
           padding:9px 11px; font-size:12px; margin:12px 0 0;
           font-family:ui-monospace,SFMono-Regular,monospace }}
   footer {{ color:var(--muted); font-size:11px; text-align:center; margin-top:6px }}
+  section.eta {{ background:linear-gradient(135deg,var(--accent),#7A5AF8); color:#fff }}
+  section.eta h2 {{ color:rgba(255,255,255,.72) }}
+  section.eta .muted {{ color:rgba(255,255,255,.6) }}
+  section.eta .stat {{ background:rgba(255,255,255,.14) }}
+  section.eta .stat span {{ color:rgba(255,255,255,.7) }}
+  section.eta .track {{ background:rgba(255,255,255,.22) }}
+  section.eta .fill {{ background:#fff }}
+  .etarow {{ display:flex; gap:10px; align-items:stretch; margin-bottom:12px;
+             flex-wrap:wrap }}
+  .etabig {{ flex:2; min-width:170px }}
+  .etabig b {{ display:block; font-size:30px; line-height:1.1;
+               font-variant-numeric:tabular-nums; letter-spacing:-.02em }}
+  .etabig span {{ font-size:11px; color:rgba(255,255,255,.72) }}
 </style></head><body><div class="wrap">
 <h1>Solvr — run status</h1>
 <p class="muted">{time.strftime('%H:%M:%S')} · refreshes every 10s ·
@@ -521,8 +577,86 @@ def render_html(state):
 </div></body></html>"""
 
 
+def eta_state():
+    """How long the active stage has left, from its own measured rate.
+
+    The rate is measured rather than assumed, by keeping a rolling log of
+    (timestamp, work done) each time this runs and fitting a slope over the recent
+    window. Every previous estimate in this project that was built on an
+    assumption -- a six-problem probe, a nominal tokens/sec -- came out wrong, and
+    an ETA that is confidently wrong is worse than none.
+    """
+    # What is running, and what counts as "work done" for it.
+    if process_alive("solvr-distill"):
+        stage = "distillation"
+        done = len(read_jsonl(RAW))
+        total = None
+        if DISTILL_LOG.exists():
+            ticks = re.findall(r"(\d+)/(\d+)\s+[\d.]+ req/s",
+                               DISTILL_LOG.read_text(errors="replace").replace("\r", "\n"))
+            if ticks:
+                done, total = int(ticks[-1][0]), int(ticks[-1][1])
+        unit = "requests"
+    elif process_alive("mlx_lm.lora"):
+        stage = "training"
+        t = training_state()
+        done, total, unit = t["iter"], t.get("iters"), "iterations"
+    elif process_alive("debug/solvr-eval") or process_alive("queue-arm.sh"):
+        stage = "evaluation"
+        per_arm = eval_records_per_arm()
+        done = sum(len(read_jsonl(ROOT / f"{a}.jsonl")) for a in EVAL_ARMS)
+        # Arms already on disk, plus one more if a queued arm is still waiting.
+        started = sum(1 for a in EVAL_ARMS if (ROOT / f"{a}.jsonl").exists())
+        pending = 1 if process_alive("queue-arm.sh") and started < len(EVAL_ARMS) else 0
+        total = per_arm * max(started + pending, 1)
+        unit = "responses"
+    else:
+        return {"active": False}
+
+    # Rolling samples, keyed by stage so a stage change resets the fit.
+    now = time.time()
+    try:
+        history = json.loads(SAMPLES.read_text())
+    except Exception:
+        history = {}
+    if history.get("stage") != stage:
+        history = {"stage": stage, "points": []}
+    points = [p for p in history.get("points", []) if now - p[0] < 900]
+    if not points or points[-1][1] != done or now - points[-1][0] > 20:
+        points.append([now, done])
+    history = {"stage": stage, "points": points[-60:]}
+    try:
+        SAMPLES.write_text(json.dumps(history))
+    except Exception:
+        pass
+
+    rate = None
+    if len(points) >= 2:
+        span = points[-1][0] - points[0][0]
+        progressed = points[-1][1] - points[0][1]
+        if span > 20 and progressed > 0:
+            rate = progressed / span          # work per second
+
+    remaining = (total - done) if total else None
+    seconds = (remaining / rate) if (rate and remaining and remaining > 0) else None
+    return {"active": True, "stage": stage, "done": done, "total": total,
+            "unit": unit, "rate": rate, "seconds": seconds,
+            "samples": len(points)}
+
+
+def eval_records_per_arm():
+    """Responses expected per evaluation arm: problems x surfaces."""
+    path = ROOT / "Packages/SolvrCore/Sources/solvr-eval/problems.json"
+    try:
+        problems = len(json.loads(path.read_text())["problems"])
+    except Exception:
+        problems = 43
+    return problems * 3
+
+
 def collect():
-    return {"distill": distill_state(), "training": training_state(), "eval": eval_state()}
+    return {"distill": distill_state(), "training": training_state(),
+            "eval": eval_state(), "eta": eta_state()}
 
 
 def main():

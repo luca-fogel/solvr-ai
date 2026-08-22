@@ -96,6 +96,26 @@ def main():
         unknown = sum(1 for r in rows if r["answerCorrect"] is None)
         print(f"| `{backend}` | {pct(correct, len(rows))} ({correct}/{len(rows)}) | {wrong} | {unknown} |")
 
+    print("\n## Completeness: how much came back\n")
+    print("Median items per response -- steps in a solution, formulas listed,")
+    print("sections in a lesson. Schema compliance is blind to this: a one-step")
+    print("solution that decodes cleanly scores a perfect 100%, so a fine-tune that")
+    print("learns to answer tersely would look like an improvement.\n")
+    print("| backend | steps | lesson sections | formulas | thin (<=1 step) |")
+    print("|---|---|---|---|---|")
+    for backend in backends:
+        cells = []
+        for surface in surfaces:
+            counts = [r.get("itemCount", 0) for r
+                      in by_backend_surface[(backend, surface)] if r.get("ok")]
+            cells.append(f"{statistics.median(counts):.0f}" if counts else "n/a")
+        steps_counts = [r.get("itemCount", 0) for r
+                        in by_backend_surface[(backend, "steps")] if r.get("ok")]
+        thin = sum(1 for c in steps_counts if c <= 1)
+        cells.append(f"{thin}/{len(steps_counts)}" if steps_counts else "n/a")
+        # surfaces order is steps, lesson, formulas
+        print(f"| `{backend}` | {cells[0]} | {cells[1]} | {cells[2]} | {cells[3]} |")
+
     print("\n## LaTeX that renders\n")
     print("Rendered with KaTeX 0.16.21 -- the version the app loads -- and")
     print("`throwOnError: true`. The app itself renders with `throwOnError: false`,")

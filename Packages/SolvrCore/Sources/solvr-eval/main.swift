@@ -127,6 +127,13 @@ struct Record: Encodable {
     var wasNormalised: Bool?
     var isClean: Bool?
     var latex: [String]
+    /// How many items the surface returned -- steps, formulas, lesson sections.
+    ///
+    /// Schema compliance is blind to this: a single-step solution that decodes
+    /// cleanly scores a perfect 100%. Thinning is a plausible fine-tuning
+    /// regression, so it has to be measured separately or it hides inside a good
+    /// number.
+    var itemCount: Int
     var finalAnswer: String?
     var expectedAnswer: String
     var expectedNumeric: Double?
@@ -262,7 +269,7 @@ for problem in problems {
                     wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
                     escapesRepaired: compliance?.escapesRepaired,
                     wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
-                    latex: tex, finalAnswer: answer,
+                    latex: tex, itemCount: steps.count, finalAnswer: answer,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
                     error: nil))
     } catch {
@@ -270,7 +277,8 @@ for problem in problems {
                     surface: "steps", ok: false, latencySeconds: 0,
                     inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
                     wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
-                    wasNormalised: nil, isClean: nil, latex: [], finalAnswer: nil,
+                    wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
+                    finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
                     error: "\(error)"))
     }
@@ -286,7 +294,8 @@ for problem in problems {
                     wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
                     escapesRepaired: compliance?.escapesRepaired,
                     wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
-                    latex: latex(from: lesson), finalAnswer: nil,
+                    latex: latex(from: lesson), itemCount: lesson.sections.count,
+                    finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
                     error: nil))
     } catch {
@@ -294,7 +303,8 @@ for problem in problems {
                     surface: "lesson", ok: false, latencySeconds: 0,
                     inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
                     wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
-                    wasNormalised: nil, isClean: nil, latex: [], finalAnswer: nil,
+                    wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
+                    finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
                     error: "\(error)"))
     }
@@ -310,7 +320,8 @@ for problem in problems {
                     wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
                     escapesRepaired: compliance?.escapesRepaired,
                     wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
-                    latex: latex(from: formulas), finalAnswer: nil,
+                    latex: latex(from: formulas), itemCount: formulas.count,
+                    finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
                     error: nil))
     } catch {
@@ -318,7 +329,8 @@ for problem in problems {
                     surface: "formulas", ok: false, latencySeconds: 0,
                     inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
                     wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
-                    wasNormalised: nil, isClean: nil, latex: [], finalAnswer: nil,
+                    wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
+                    finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
                     error: "\(error)"))
     }
