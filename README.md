@@ -228,6 +228,13 @@ adapter weights are **not** tracked: they are a build product, and
 - [tools/finetune/README.md](tools/finetune/README.md) — the LoRA run on a 4B:
   synthetic problem generation, distillation, and the checkpoint-numbering trap
   that made "iteration 525" mean something other than it looks like
+- **"Teaching a small model to speak your schema"** —
+  [PDF](docs/lesson/solvr-cs-lesson.pdf) ·
+  [HTML](docs/lesson/lesson.html) · the same material written as a lesson rather
+  than as notes: what schema compliance is, why constrained decoding makes it
+  free, and what the fine-tune actually taught the model. Typeset by the same
+  vendored KaTeX the app ships, so the PDF shows what the app would draw
+  (`docs/lesson/build.sh`).
 
 ## See also
 
