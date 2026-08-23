@@ -26,15 +26,25 @@ defaults write "$BUNDLE_ID" SolvrScreen -string steps
 
 osascript -e "tell application id \"$BUNDLE_ID\" to quit" 2>/dev/null || true
 open "$APP"
-sleep 12
 
-BOUNDS=$(osascript -e 'tell application "System Events" to tell process "solvr.ai"
-  set p to position of window 1
-  set s to size of window 1
-  return (item 1 of p as text) & "," & (item 2 of p as text) & "," & (item 1 of s as text) & "," & (item 2 of s as text)
-end tell')
-echo "==> window at $BOUNDS"
-screencapture -x -R"$BOUNDS" docs/images/macos.png
+# 12s was not enough. The step maths renders in WKWebViews, and a capture taken
+# before they paint gives grey placeholder boxes where the LaTeX should be --
+# which is what shipped in the committed screenshot for a while.
+sleep 25
+
+osascript -e 'tell application id "'"$BUNDLE_ID"'" to activate' 2>/dev/null || true
+sleep 2
+
+# Capture the WINDOW, not a screen rectangle.
+#
+# This used to be `screencapture -R <bounds>`, which captures a region of the
+# display -- so anything floating over the app landed in the committed image. It
+# did: a terminal window ended up covering half of docs/images/macos.png in the
+# published README. `-l <windowID>` captures the window's own surface and cannot
+# pick up an overlap.
+WID="$(swift tools/window-id.swift "solvr.ai")"
+echo "==> window id $WID"
+screencapture -x -o -l "$WID" docs/images/macos.png
 echo "    docs/images/macos.png"
 
 osascript -e "tell application id \"$BUNDLE_ID\" to quit" 2>/dev/null || true

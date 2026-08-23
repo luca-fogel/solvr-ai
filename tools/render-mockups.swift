@@ -219,10 +219,10 @@ func renderSocialCard() {
               screenHeight: 560, rotation: -6)
 
     _ = draw("solvr.", at: CGPoint(x: 96, y: 470), size: 96, weight: .bold, colour: white, in: ctx, tracking: -2)
-    _ = draw("Step-by-step maths solutions and lesson plans, from a photo. Built in Swift and SwiftUI on the Claude API.",
+    _ = draw("Step-by-step maths solutions and lesson plans, from a photo. Swift and SwiftUI, running on Apple's on-device model.",
              at: CGPoint(x: 96, y: 340), size: 34, weight: .regular,
              colour: CGColor(gray: 0.74, alpha: 1), in: ctx, maxWidth: 600)
-    _ = draw("iOS · SWIFT · SWIFTUI · UNRELEASED", at: CGPoint(x: 96, y: 120), size: 22,
+    _ = draw("iOS · SWIFT · SWIFTUI · ON-DEVICE · UNRELEASED", at: CGPoint(x: 96, y: 120), size: 22,
              weight: .semibold, colour: indigoHi, in: ctx, tracking: 3)
     save(ctx, as: "social-card")
 }

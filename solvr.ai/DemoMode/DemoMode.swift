@@ -1,7 +1,7 @@
 import Foundation
 import SolvrCore
 
-/// Runs the app against canned responses instead of the Claude API.
+/// Runs the app against canned responses instead of the on-device model.
 ///
 /// Why it exists: without an API key, solvr.ai can show you a text field and
 /// nothing else, which makes it impossible to evaluate, impossible to screenshot

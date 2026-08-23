@@ -167,10 +167,18 @@ for two reasons beyond speed:
   `∫₀¹ 3x² dx` instead of a 4-megapixel photograph is the difference between a
   cheap request and an expensive one.
 
-Claude Vision is still used for the harder case — `detectProblems` finds and
-boxes multiple problems on a page, which Vision's text recogniser cannot do,
-since "which of these lines form one problem" is a semantic question. The crop
-overlay exists because OCR on a full page of homework returns everything at once.
+Finding *which* problems are on a page used to be the harder case, and it used to
+be a hosted vision call: `detectProblems` sent the photograph to a model that
+could see it and asked for bounding boxes back. That backend is gone and Apple's
+on-device model cannot replace it — it accepts no image input at all.
+
+Vision does it now. The trade is real in both directions. A vision model could
+answer "which of these lines form one problem", which is a semantic question, and
+Vision cannot: it returns one box per recognised line and the grouping is not
+attempted. What Vision gives back is a *measured* box rather than coordinates a
+model was asked to estimate, which is the part that used to drift. The crop
+overlay still exists because OCR on a full page of homework returns everything at
+once.
 
 ## Maths rendering
 
@@ -187,14 +195,6 @@ copy in the app had already drifted into forgetting quotes.
 **Dollar delimiters are stripped before wrapping.** Models emit `$...$`, `$$...$$`
 and bare expressions interchangeably, and a `$` that survives into the KaTeX
 input renders as a literal dollar sign in the middle of an equation.
-
-## Model selection, and a migration shim
-
-`selectedModel` maps stored identifiers forward: a preference saved as
-`claude-sonnet-4-20250514` resolves to the current Sonnet, and the retired Haiku
-identifier resolves to the current Haiku. Model identifiers are retired faster
-than users open Settings, and the alternative is an app that starts returning 404
-after an upgrade for a reason the user cannot see or fix.
 
 ## Demo mode
 

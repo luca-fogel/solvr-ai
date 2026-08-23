@@ -14,10 +14,10 @@ no API key, no server, no network, nothing leaving the device.
 
 > **Status: built and working, not released.** It is not on the App Store, there
 > are no users, and there are no download numbers to quote. It runs on my phone
-> and on my Mac, and you can run it on yours in about five minutes — including
-> without an API key — see [No key is required to start](#no-key-is-required-to-start)
-> for the default backend, and [Try it without a key](#try-it-without-a-key) for the
-> fixtures.
+> and on my Mac, and you can run it on yours in about five minutes. There is no
+> key to paste and no account to make — see
+> [Try it without a key](#try-it-without-a-key) if your device cannot run Apple
+> Intelligence.
 
 It exists because I have taught calculus and statistics since 2022 and kept
 rebuilding the same lesson plans by hand. The feature set is not a guess about
@@ -75,7 +75,7 @@ cd solvr-ai
 open solvr.ai.xcodeproj      # run on any iOS 26 simulator
 ```
 
-Then turn on **Settings → Try it without a key → Demo mode**, or launch with
+Then turn on **Settings → Try it without a model → Demo mode**, or launch with
 `-SolvrDemo YES`. Answers come from bundled fixtures; every problem in them is
 synthetic, written for this repository.
 

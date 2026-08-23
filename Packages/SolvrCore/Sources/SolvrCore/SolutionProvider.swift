@@ -38,7 +38,7 @@ public enum ProblemInput: Sendable, Equatable {
 public protocol SolutionProvider: Sendable {
     /// Stable, log-safe name for this backend. Recorded against every
     /// measurement, so it has to identify the *configuration*, not just the
-    /// family: `anthropic/claude-opus-5` rather than `anthropic`.
+    /// family: `apple-on-device/guided` rather than `apple`.
     var identifier: String { get }
 
     /// How many requests this backend will genuinely serve at once.

@@ -61,8 +61,8 @@ final class ScannerViewModel {
                 }
             } catch {
                 await MainActor.run {
-                    let claudeError = error as? SolverError
-                    errorMessage = claudeError?.errorDescription ?? error.localizedDescription
+                    let solverError = error as? SolverError
+                    errorMessage = solverError?.errorDescription ?? error.localizedDescription
                     state = .camera
                     Haptics.medium()
                 }
