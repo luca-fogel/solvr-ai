@@ -13,11 +13,13 @@ For what the app is and how to run it, see the [README](../README.md).
 
 ## The prompts ask for strict JSON, and mostly get it
 
-Every request in `Services/ClaudeAPIManager.swift` asks for a specific JSON
-shape, matched to a `Codable` type in `Models/`. The lesson prompt is the most
-demanding: a title, a topic line, an introduction, an array of sections each with
-an optional formula, an optional note and an optional list of steps, and a
-closing takeaway.
+Every request asks for a specific JSON shape, matched to a `Codable` type in
+`SolvrCore/Models/`. The prompts live with the provider that sends them --
+`Providers/AnthropicPrompts.swift` for the hosted API, and its own inside each of
+the other backends -- because a prompt is a property of the backend, not of the
+app. The lesson prompt is the most demanding: a title, a topic line, an
+introduction, an array of sections each with an optional formula, an optional
+note and an optional list of steps, and a closing takeaway.
 
 Two things about that are worth stating, because they are what the rest of this
 document is about.
@@ -218,12 +220,18 @@ README with one command.
   step is displayed with the same confidence as a right one, and detecting that
   automatically is a genuinely hard problem, not an oversight.
 - **Handwriting.** Vision reads printed problems well and handwriting unevenly.
-- **No local model, yet.** Every solution requires a hosted API and a key. The
-  next piece of work is a provider abstraction with three backends — the hosted
-  API, a local OpenAI-compatible server, and Apple's on-device
-  `FoundationModels`. The last of those is the interesting one: guided generation
-  constrains output to a schema, which makes this document's entire repair ladder
-  *structurally unnecessary* on that path. That comparison should be measured,
-  not assumed.
+- **The constrained-versus-unconstrained comparison, on the hosted path.** The
+  provider abstraction described above this section is built: three backends
+  behind one protocol — the hosted API, a local OpenAI-compatible server, and
+  Apple's on-device `FoundationModels`. The last of those settles the question
+  this document raises, in the direction the document expected: `@Generable`
+  constrains decoding to a schema, so the repair ladder is *structurally
+  unnecessary* on that path. What has **not** been run is the same comparison on
+  the hosted API, where `usesStructuredOutputs` exists in code and has never
+  made a call. Only the local backends have been measured against each other
+  ([evaluation-local.md](evaluation-local.md)).
+- **Answering on a real device.** On-device solving works in the simulator and
+  reports `modelNotReady` on the phone, so no solve has ever completed on
+  hardware. See the README's *What it does not do*.
 - **Streaming.** Responses arrive whole, so a long lesson shows a shimmer rather
   than filling in progressively.
