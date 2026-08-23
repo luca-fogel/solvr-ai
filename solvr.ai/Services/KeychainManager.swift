@@ -12,7 +12,14 @@ import Security
 /// The one concession: a key written to `UserDefaults` by an older build is
 /// migrated into the Keychain on first read and then erased. Leaving it there to
 /// rot would be worse than moving it.
-enum KeychainManager {
+///
+/// `nonisolated` because this target defaults to main-actor isolation and a
+/// provider's `apiKey` closure is `@Sendable` -- it reads the key on whatever
+/// context the request is running on, by design, so that a key pasted mid-session
+/// is picked up without rebuilding the provider. Safe to do: there is no state
+/// here, and both backing stores (the Keychain via `Security`, and `UserDefaults`
+/// on the migration path) are thread-safe.
+nonisolated enum KeychainManager {
 
     private static let service = "ai.solvr.apikey"
 
