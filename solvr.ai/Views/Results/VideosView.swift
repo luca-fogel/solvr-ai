@@ -56,21 +56,7 @@ struct VideosView: View {
             HStack(spacing: 14) {
                 // Thumbnail
                 ZStack {
-                    if let thumbURL = video.thumbnailImageURL {
-                        AsyncImage(url: thumbURL) { phase in
-                            if case .success(let image) = phase {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 90, height: 64)
-                                    .clipped()
-                            } else {
-                                thumbnailPlaceholder
-                            }
-                        }
-                    } else {
-                        thumbnailPlaceholder
-                    }
+                    thumbnailPlaceholder
 
                     Image(systemName: "play.fill")
                         .font(.system(size: 18))

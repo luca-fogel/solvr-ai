@@ -45,13 +45,16 @@ public struct VideoItem: Codable, Identifiable, Sendable {
         return URL(string: "https://www.youtube.com/results?search_query=\(query)")
     }
 
-    public var thumbnailImageURL: URL? {
-        if let videoId, !videoId.isEmpty {
-            return URL(string: "https://img.youtube.com/vi/\(videoId)/mqdefault.jpg")
-        }
-        if let thumbnailURL, let url = URL(string: thumbnailURL) {
-            return url
-        }
-        return nil
-    }
+    // There is deliberately no thumbnail URL here any more.
+    //
+    // This used to build https://img.youtube.com/vi/<id>/mqdefault.jpg, which the
+    // Videos tab fetched automatically on appear -- an unannounced request to
+    // Google every time the user opened a tab, in an app that otherwise sends
+    // nothing anywhere. `thumbnailURL` is still decoded because it is part of the
+    // wire shape, but nothing loads it.
+    //
+    // Little is lost: the on-device model is asked for *search queries* rather
+    // than video IDs, precisely because a model with no network invents IDs that
+    // 404 -- so for the backend the app actually ships there was rarely an ID to
+    // build a thumbnail from in the first place.
 }
