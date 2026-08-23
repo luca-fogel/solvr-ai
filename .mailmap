@@ -1,0 +1,8 @@
+# One identity, three spellings. Without this the contributor graph splits a
+# single author across three entries, which reads as a team that was never here.
+#
+# Canonical is the name and address the other public repositories use. The
+# gmail address stays visible in the raw history of the earliest commits --
+# a mailmap changes how git presents an author, not what was recorded.
+foggylulu <fogelrobion.l@northeastern.edu> <lucafogelrobion@gmail.com>
+foggylulu <fogelrobion.l@northeastern.edu> Luca Fogel Robion <fogelrobion.l@northeastern.edu>
