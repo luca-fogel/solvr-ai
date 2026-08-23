@@ -1,5 +1,7 @@
 # solvr.ai
 
+[![CI](https://github.com/foggylulu/solvr-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/foggylulu/solvr-ai/actions/workflows/ci.yml)
+
 Photograph a maths problem. Get the working, and the lesson behind it.
 
 A native **iOS and Mac Catalyst** app in Swift and SwiftUI. Point the camera at a
@@ -138,6 +140,14 @@ swift test --package-path Packages/SolvrCore    # 76 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build
 ```
+
+[CI](.github/workflows/ci.yml) runs the first of those on every push, asserts
+that the test count quoted above matches what the run reports, and checks that
+[docs/evaluation-local.md](docs/evaluation-local.md) still regenerates from
+[its records](docs/eval-records/). The two `xcodebuild` lines are **not** in CI:
+they need Xcode 26 and the iOS 26 SDK, and a workflow pinned to an image that
+may not have them yet would produce a red badge that says nothing about the
+code. Those two are a local check.
 
 ## What it does not do
 

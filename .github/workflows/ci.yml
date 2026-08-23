@@ -1,0 +1,72 @@
+# What can honestly be checked on a hosted runner, and nothing else.
+#
+# The app targets are deliberately absent. Building them needs Xcode 26 and the
+# iOS 26 SDK, and pinning a workflow to an image that may not have them yet buys
+# a red badge that says nothing about the code. The README states the two
+# xcodebuild commands for a local check instead.
+#
+# What is here is the part that was designed to be runnable anywhere:
+# SolvrCore imports only Foundation, so its suite needs no simulator, no
+# signing and no API key -- which is the whole reason it is a separate package.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: SolvrCore tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Test
+        run: |
+          set -o pipefail
+          swift test --package-path Packages/SolvrCore 2>&1 | tee test.log
+
+      # The README quotes a test count. It was wrong by half once, so the number
+      # is asserted against the run rather than trusted to be remembered.
+      - name: README test count matches the run
+        run: |
+          set -euo pipefail
+          actual=$(grep -oE 'Test run with [0-9]+ tests' test.log | grep -oE '[0-9]+' | head -1)
+          declared=$(grep -oE '# [0-9]+ tests' README.md | grep -oE '[0-9]+' | head -1)
+          echo "run: ${actual}   README: ${declared}"
+          test -n "$actual"
+          test "$declared" = "$actual"
+
+  evidence:
+    name: Tables match their evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # docs/evaluation-local.md is report.py's stdout and nothing else. If a
+      # number in it is ever edited by hand, or the records change without the
+      # document being regenerated, this diff fails. Stdlib only, so no install
+      # step and nothing to pin.
+      - name: docs/evaluation-local.md regenerates from docs/eval-records/
+        run: |
+          python3 tools/eval/report.py docs/eval-records/*.graded.jsonl \
+            | diff - docs/evaluation-local.md
+
+      - name: Every record is parseable and accounted for
+        run: |
+          python3 - <<'PY'
+          import glob, json
+          recs = [json.loads(l) for f in glob.glob("docs/eval-records/*.graded.jsonl") for l in open(f)]
+          assert len(recs) == 387, len(recs)
+          assert len({r["problemId"] for r in recs}) == 43
+          assert len({r["backend"] for r in recs}) == 3
+          print(f"{len(recs)} records, 43 problems, 3 arms")
+          PY

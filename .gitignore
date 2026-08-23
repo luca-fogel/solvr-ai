@@ -53,3 +53,6 @@ docs/HANDOVER.md
 # The graded evaluation records are the evidence for docs/evaluation-local.md,
 # so they are tracked despite the patterns above.
 !docs/eval-records/*.jsonl
+
+# swift test transcript, captured by CI
+test.log
