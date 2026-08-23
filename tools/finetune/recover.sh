@@ -8,12 +8,15 @@
 # real traffic instead of only against fixtures.
 #
 #   tools/finetune/recover.sh <distill-stderr-log> <raw.jsonl to append to>
+#
+# Historical: solvr-distill was removed with the hosted backend, so this no longer
+# runs as written. Kept because it is the record of how the dataset was completed.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 LOG="${1:-/tmp/distill-run.err}"
 RAW="${2:-tools/finetune/data/raw.jsonl}"
-: "${MOONSHOT_API_KEY:?export it first: set -a; . ~/.config/solvr/kimi.env; set +a}"
+: "${MOONSHOT_API_KEY:?export the teacher API key first}"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
