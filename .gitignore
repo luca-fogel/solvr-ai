@@ -25,9 +25,6 @@ Carthage/Build/
 *.env
 Secrets.plist
 
-# Claude Code local settings
-.claude/settings.local.json
-
 # Local agent / tooling state
 .claude-flow/
 .claude/
