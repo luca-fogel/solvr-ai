@@ -199,9 +199,13 @@ One more result worth keeping: validation loss said @525 was far better than @60
 (0.338 vs 0.497) and the task metrics called them a tie. A validation loss on two
 batches predicted nothing that mattered.
 
-**Recommendation, taken: do not ship it.** Base Qwen3-4B is better overall, and
-the adapter stays in the repo as a documented negative result rather than as a
-default.
+**Recommendation, taken: do not ship it.** Base Qwen3-4B is better overall. What
+stays in the repo is the negative result and everything needed to reproduce it —
+the training config, the problem generator, the adapter's
+`adapter_config.json`, the checkpoint provenance, and the graded records behind
+every number above ([docs/eval-records/](docs/eval-records/)). The 14 MB of
+adapter weights are **not** tracked: they are a build product, and
+`tools/finetune/train.sh` rebuilds them from the config.
 
 ## Documentation
 

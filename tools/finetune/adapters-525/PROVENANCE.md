@@ -1,6 +1,9 @@
 # Cumulative iteration 525 — the best validation loss
 
-`adapters.safetensors` here is a copy of
+This directory holds the `adapter_config.json` for the checkpoint the evaluation
+calls `@525`, and the record of which file that was. The weights themselves
+(`adapters.safetensors`, 14 MB) are **not tracked** — they are a build product of
+`tools/finetune/train.sh`. In the run described below they were a copy of
 `tools/finetune/adapters/0000200_adapters.safetensors`.
 
 The name is misleading and the mapping matters, so it is written down rather than
