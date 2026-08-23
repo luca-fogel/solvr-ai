@@ -40,16 +40,10 @@ enum OCRService {
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty, !MathNotation.looksLikeProse(trimmed) else { return nil }
 
-                // Vision's boxes are normalised with the origin at the BOTTOM
-                // left; every consumer here works in percentages from the TOP
-                // left. Getting this wrong flips the crop vertically, which looks
-                // like a detection bug rather than a coordinate one.
                 let box = observation.boundingBox
                 return DetectedProblem(
-                    bbox: .init(top: (1 - box.maxY) * 100,
-                                left: box.minX * 100,
-                                width: box.width * 100,
-                                height: box.height * 100),
+                    bbox: .fromVision(minX: box.minX, minY: box.minY,
+                                      width: box.width, height: box.height),
                     latex: MathNotation.toLaTeX(trimmed))
             }
         }

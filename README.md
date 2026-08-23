@@ -117,7 +117,7 @@ solvr.ai/
   Views/           Home · Scanner · Results (Steps/Lesson/Formulas/Videos/Chat) · History · Settings
   Utilities/       Theme, HTMLBuilder (KaTeX), PlatformHelper
   DemoMode/        fixtures, the drawn worksheet, launch-argument wiring
-Packages/SolvrCore/  the text handling that is worth testing, and its 73 tests
+Packages/SolvrCore/  the text handling that is worth testing, and its 77 tests
 ```
 
 `SolvrCore` is a local Swift package holding everything that is pure text
@@ -148,7 +148,7 @@ followed by an unescaped quote.
 ## Tests
 
 ```sh
-swift test --package-path Packages/SolvrCore    # 73 tests, ~2s, no simulator
+swift test --package-path Packages/SolvrCore    # 77 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build
 ```
