@@ -112,7 +112,10 @@ def distill_state():
     cost = (spend_in * PRICE_IN + spend_out * PRICE_OUT) / 1e6
 
     return {
-        "running": process_alive("solvr-distill"),
+        # Never in progress any more: solvr-distill was deleted with the hosted
+        # backend, so what is left below is the record of the run that produced the
+        # dataset, not a stage that can still be advancing.
+        "running": False,
         "examples": len(rows),
         "bySurface": dict(by_surface),
         "done": done, "total": total, "rate": rate, "eta": eta,
@@ -587,17 +590,7 @@ def eta_state():
     an ETA that is confidently wrong is worse than none.
     """
     # What is running, and what counts as "work done" for it.
-    if process_alive("solvr-distill"):
-        stage = "distillation"
-        done = len(read_jsonl(RAW))
-        total = None
-        if DISTILL_LOG.exists():
-            ticks = re.findall(r"(\d+)/(\d+)\s+[\d.]+ req/s",
-                               DISTILL_LOG.read_text(errors="replace").replace("\r", "\n"))
-            if ticks:
-                done, total = int(ticks[-1][0]), int(ticks[-1][1])
-        unit = "requests"
-    elif process_alive("mlx_lm.lora"):
+    if process_alive("mlx_lm.lora"):
         stage = "training"
         t = training_state()
         done, total, unit = t["iter"], t.get("iters"), "iterations"
