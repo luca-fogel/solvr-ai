@@ -9,12 +9,17 @@ enum ProviderFactory {
     /// `selectedModel`, which is a model name *within* a backend.
     static let backendKey = "selectedBackend"
 
+    /// Declaration order is the Settings picker's order (`allCases`), and it is
+    /// ordered by how much the user has to do before it will answer: nothing, then
+    /// paste a key, then own a second machine. The raw values are unchanged, so a
+    /// preference stored by an earlier build still resolves.
     enum Backend: String, CaseIterable, Identifiable {
+        /// Apple's on-device model. No key, no network, nothing leaves the phone,
+        /// and therefore the default on a device that supports it.
+        case appleOnDevice
         /// The hosted API. The quality ceiling, and the only backend that reads a
         /// photograph natively.
         case anthropic
-        /// Apple's on-device model. No key, no network, nothing leaves the phone.
-        case appleOnDevice
         /// A model you serve yourself, reached over the local network or a tailnet.
         case localServer
 
@@ -47,7 +52,33 @@ enum ProviderFactory {
 
     static var selectedBackend: Backend {
         let stored = UserDefaults.standard.string(forKey: backendKey) ?? ""
-        return Backend(rawValue: stored) ?? .anthropic
+        return Backend(rawValue: stored) ?? firstRunDefault
+    }
+
+    /// What answers on a first launch, before the user has chosen anything.
+    ///
+    /// This used to be `.anthropic`, which meant a fresh install could do nothing
+    /// at all: the first solve failed with `noAPIKey` on a screen that had never
+    /// said a credential was needed. The app ships a backend that needs no key and
+    /// no network, so that is the one a first run should get.
+    ///
+    /// A preference order rather than a constant, because the right answer depends
+    /// on the device. `appleOnDevice` is not configured on hardware without Apple
+    /// Intelligence, and selecting it there would move the failure rather than
+    /// remove it -- which is exactly what `SolutionProvider.isConfigured` exists to
+    /// prevent: "a backend that is not configured should be offered to the user but
+    /// not silently selected."
+    ///
+    /// `.anthropic` stays as the last resort rather than being dropped. When
+    /// nothing is configured, Settings has to ask for *something*, and a key is the
+    /// only one of the three a user can obtain without owning a second machine.
+    /// Note `LocalServerProvider.isConfigured` is unconditionally `true` -- it
+    /// cannot know whether a URL was ever entered -- so that check belongs here,
+    /// where the stored URL lives.
+    static var firstRunDefault: Backend {
+        if onDevice.isConfigured { return .appleOnDevice }
+        if !localServerURLString.isEmpty { return .localServer }
+        return .anthropic
     }
 
     /// Resolve the provider for one request.

@@ -11,7 +11,7 @@ struct SettingsView: View {
     @State private var saveSuccess = false
     @State private var saveFailed = false
     @State private var showClearConfirm = false
-    @AppStorage(ProviderFactory.backendKey) private var backend: String = ProviderFactory.Backend.anthropic.rawValue
+    @AppStorage(ProviderFactory.backendKey) private var backend: String = ProviderFactory.firstRunDefault.rawValue
     @AppStorage(ProviderFactory.localServerURLKey) private var localServerURL: String = ""
     @AppStorage(ProviderFactory.localServerModelKey) private var localServerModel: String = ""
     @State private var localToken: String = ""
@@ -21,7 +21,7 @@ struct SettingsView: View {
     @AppStorage(DemoMode.defaultsKey) private var demoMode: Bool = false
 
     private var selectedBackend: ProviderFactory.Backend {
-        ProviderFactory.Backend(rawValue: backend) ?? .anthropic
+        ProviderFactory.Backend(rawValue: backend) ?? ProviderFactory.firstRunDefault
     }
 
     var body: some View {

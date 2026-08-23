@@ -17,7 +17,9 @@ actually measured.
 > **Status: built and working, not released.** It is not on the App Store, there
 > are no users, and there are no download numbers to quote. It runs on my phone
 > and on my Mac, and you can run it on yours in about five minutes — including
-> without an API key, see [Try it without a key](#try-it-without-a-key).
+> without an API key — see [No key is required to start](#no-key-is-required-to-start)
+> for the default backend, and [Try it without a key](#try-it-without-a-key) for the
+> fixtures.
 
 It exists because I have taught calculus and statistics since 2022 and kept
 rebuilding the same lesson plans by hand. The feature set is not a guess about
@@ -84,9 +86,26 @@ raw JSON containing unescaped LaTeX — exactly what a model sends — and they 
 parsed by the same ladder the network path uses. If that ladder regresses, demo
 mode breaks visibly.
 
-## Using your own API key
+## No key is required to start
 
-Settings → API Configuration → paste an [Anthropic API key](https://console.anthropic.com/).
+**A fresh install defaults to Apple's on-device model** — no key, no network,
+nothing leaving the device. There is no API-key wall in front of the app: the
+default is chosen per device by `ProviderFactory.firstRunDefault`, which picks the
+first backend that is actually configured rather than a constant. On hardware
+without Apple Intelligence that falls through to a local server if one has been
+set, and only then to the hosted API — because when nothing is configured,
+Settings has to ask for something, and a key is the one thing you can get without
+owning a second machine.
+
+Read that alongside *What it does not do*: on-device answering is verified in the
+simulator and has **never completed on a real iPhone**, which reports
+`modelNotReady`. The default spares you a key; it does not yet prove a phone can
+answer offline.
+
+## Using the hosted API
+
+Settings → Where answers come from → **Anthropic API**, then paste an
+[Anthropic API key](https://console.anthropic.com/).
 It is stored in the **Keychain**, and if the Keychain write fails the app tells
 you so and stores nothing. There is deliberately no plaintext fallback: an
 earlier version fell back to `UserDefaults` and still reported success, which
