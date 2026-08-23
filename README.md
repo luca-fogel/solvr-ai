@@ -148,13 +148,11 @@ xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' b
   device, and on an Apple-silicon host the simulator may be proxying the Mac's own
   model rather than proving anything about a phone. Treat on-device as built and
   unproven.
-- **The backend comparison is a harness, not a verdict.** The hosted
-  constrained-vs-unconstrained comparison exists in code and **has never been
-  run** — no Anthropic call has been made by it. The local three-arm comparison's
-  first attempt was void: a port race made all three arms serve the same model,
-  which is visible as 129 byte-identical outputs. So the fine-tuned model is
-  **unmeasured** against the base model except for one 12-problem probe, where
-  steps compliance went 82% → 100% on n=11 and nothing else moved.
+- **The hosted comparison has never been run.** The
+  constrained-vs-unconstrained hosted method exists in code and no Anthropic call
+  has ever been made by it. Only the local backends have been measured against
+  each other.
+- **The fine-tune is not shipped, because it lost.** See below.
 - **No answer verification.** The app does not check the model's arithmetic. It
   is a tutor's explanation, not a proof assistant, and a wrong step will be
   presented as confidently as a right one.
@@ -168,6 +166,42 @@ xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' b
   and a fraction as two numbers with a line between them. That downgrade is
   recorded per backend rather than glossed over, which is why a wrapped provider
   reports itself as `<backend>+ocr`.
+
+## What the fine-tune actually did
+
+A LoRA on Qwen3-4B, trained on synthetic problems distilled from a larger model,
+then measured against its own base over 43 problems and 387 records
+([docs/evaluation-local.md](docs/evaluation-local.md)):
+
+| | base | +LoRA @525 | +LoRA @600 |
+|---|---|---|---|
+| schema clean — steps | 86% | 88% | **93%** |
+| schema clean — lesson | 88% | **98%** | 95% |
+| schema clean — formulas | **60%** | 50% | 56% |
+| **maths correct** | **74%** | 58% | 55% |
+| thin answers (≤1 step) | **8/42** | 18/43 | 17/42 |
+| LaTeX renders | 97% | 97% | 97% |
+
+**It learned exactly what it was trained to learn, and that was not what I
+wanted.** Compliance improved on the two prose-heavy surfaces, and escape repairs
+fell. Correctness fell nineteen points, and the step-count distribution says why:
+the tuned model emits **one compliant step instead of working the problem**. Thin
+answers more than doubled, and undecidable answers went 4 → 10, because a
+one-step answer often has no parseable result in it.
+
+Format overfitting, and 0.091% of the weights was enough to do it. The
+uncomfortable part is the metric: **schema compliance cannot see this failure at
+all** — a one-step solution that decodes cleanly scores a perfect 100%. The
+completeness column is the only reason it was caught, which is an argument for
+measuring the thing you want rather than the thing that is easy to count.
+
+One more result worth keeping: validation loss said @525 was far better than @600
+(0.338 vs 0.497) and the task metrics called them a tie. A validation loss on two
+batches predicted nothing that mattered.
+
+**Recommendation, taken: do not ship it.** Base Qwen3-4B is better overall, and
+the adapter stays in the repo as a documented negative result rather than as a
+default.
 
 ## Documentation
 
