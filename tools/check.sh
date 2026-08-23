@@ -23,11 +23,21 @@ swift test --package-path Packages/SolvrCore 2>&1 | tee /tmp/solvr-test.log | ta
 # asserted against the run rather than trusted to be remembered.
 note "README test count matches the run"
 actual=$(grep -oE 'Test run with [0-9]+ tests' /tmp/solvr-test.log | grep -oE '[0-9]+' | head -1)
-declared=$(grep -oE '# [0-9]+ tests' README.md | grep -oE '[0-9]+' | head -1)
-echo "run: ${actual}   README: ${declared}"
-if [ -z "$actual" ] || [ "$declared" != "$actual" ]; then
-  echo "MISMATCH: README says ${declared}, the run reported ${actual}" >&2
+# Every "<n> tests" in the README, not just the one this check was written
+# for: the count appeared twice and only one of them was ever asserted, so the
+# other sat wrong through two releases.
+echo "run: ${actual}"
+if [ -z "$actual" ]; then
+  echo "could not read a test count from the run" >&2
   fail=1
+else
+  for declared in $(grep -oE '[0-9]+ tests' README.md | grep -oE '^[0-9]+'); do
+    if [ "$declared" != "$actual" ]; then
+      echo "MISMATCH: README says ${declared}, the run reported ${actual}" >&2
+      fail=1
+    fi
+  done
+  echo "README mentions: $(grep -coE '[0-9]+ tests' README.md), all matching"
 fi
 
 # docs/evaluation-local.md is report.py's stdout and nothing else. If a number in

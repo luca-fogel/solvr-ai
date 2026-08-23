@@ -41,6 +41,8 @@ The pipeline takes either, through the same downstream code, because the prompts
 and the JSON schemas are shared and only the request envelope differs:
 
 ```sh
+# Historical: solvr-distill and the teacher path were removed with the hosted
+# backend. Kept because this is the record of the run that produced the dataset.
 # Anthropic Messages API, output_config.format
 export ANTHROPIC_API_KEY=...
 swift run solvr-distill --confirm-spend                       # ~$41.60 for 400 problems

@@ -1,4 +1,18 @@
-# One interface, several models
+# One interface, one model — and why the interface stayed
+
+> **This document is partly history now.** Solvr shipped three backends behind
+> one `SolutionProvider`: a hosted Anthropic API, a self-hosted
+> OpenAI-compatible server, and Apple's on-device model. **The first two were
+> removed** — they were the only reason the app held a credential or opened a
+> socket, and the measurement work they existed for is finished and published in
+> [evaluation.md](evaluation.md) and [eval-records/](eval-records/).
+>
+> What is written below about the protocol, the OCR bridge and the concurrency
+> limits is current. What is written about the hosted and self-hosted providers
+> describes code that is no longer in the tree; it is kept because the design
+> reasoning is what makes the remaining shape legible, and because deleting the
+> account of a thing you removed is how a repository starts lying about how it
+> got here. `git log` has the code.
 
 Solvr used to have exactly one way to get an answer, and the type system said so.
 `ClaudeAPIManager` was a singleton holding the prompts, the request queue, the
@@ -6,8 +20,24 @@ decode ladder, the app's loading flags, and a demo short-circuit at the top of
 all twelve of its methods. Four SwiftUI views named it in their type signatures,
 because the error enum was nested inside it.
 
-This describes the shape it has now, and the three constraints that produced that
-shape rather than a tidier-looking one.
+It now has one way to get an answer again — but behind a protocol, which is not
+the same thing, and the difference is the point of this document.
+
+## Why keep a seam with one implementation behind it
+
+Three reasons, none of them "we might add a backend later":
+
+1. **The evaluation harness drives the same code the app drives.** That is only
+   true because `solvr-eval` depends on the protocol rather than on the app. A
+   harness with its own client measures a second implementation and reports the
+   numbers as if they came from the first.
+2. **Demo mode is a provider.** `FixtureSolutionProvider` is how every screen is
+   driven with no model at all, and it is what makes the app usable on hardware
+   without Apple Intelligence. Collapsing the seam would put a demo branch back
+   inside the real path, which is exactly the shape `ClaudeAPIManager` had.
+3. **`SightedProvider` is a decorator.** Apple's model accepts no image input, so
+   something has to bridge OCR in — and it does it by inspecting
+   `acceptsImageInput` rather than by knowing which backend it wrapped.
 
 ## The protocol
 
