@@ -1,7 +1,16 @@
 # Measuring Solvr's backends
 
-Solvr can be pointed at more than one model. This describes how the comparison is
-measured, what the numbers mean, and what they do not show.
+> **Read this first.** Solvr now runs on Apple's on-device model and nothing
+> else. The hosted and self-hosted backends described below **have been removed
+> from the app.** Everything in this document still stands as an account of what
+> was measured and how — and the 387 records in [eval-records/](eval-records/)
+> are unchanged, still regenerate the tables byte-for-byte, and are still
+> checked by `tools/check.sh`. A measurement does not stop being true because
+> the code that produced it was deleted. It does stop being repeatable, and that
+> is stated where it matters below.
+
+Solvr could be pointed at more than one model. This describes how the comparison
+was measured, what the numbers mean, and what they do not show.
 
 Nothing here is an opinion about which backend is better. The point of building a
 harness was to stop having that conversation in adjectives.
@@ -117,7 +126,7 @@ unconstrained decoding**, and the hosted API can be either:
 | arm | how the shape is obtained | repair ladder |
 | --- | --- | --- |
 | `anthropic` | the prompt asks: "Return ONLY valid JSON" | **load-bearing** |
-| `anthropic-constrained` | `output_config.format` with a JSON Schema | unreachable |
+| `anthropic-constrained` | `output_config.format` with a JSON Schema | unreachable *(backend since removed)* |
 
 The prompt is **identical** between the two arms. Under structured outputs the
 "no markdown fences" instructions are redundant and a production build would
@@ -137,13 +146,20 @@ model usable, which is close to the opposite of the usual framing.
 real key — roughly 43 problems x 3 surfaces x 2 arms — and that is the owner's
 call, not the harness's. The command is below.
 
-## Nothing hosted has been run
+## Nothing hosted was ever run, and now nothing hosted can be
 
 Stated before the numbers, because a document full of tables invites the
-assumption that the tables were filled in. **No hosted evaluation has been
-executed.** The constrained-vs-unconstrained comparison described above is a
-method, and the command for it spends money, which is why it is deliberately
-awkward to run by accident.
+assumption that the tables were filled in. **No hosted evaluation was ever
+executed.** The constrained-vs-unconstrained comparison described above was a
+method, never a result: the command for it spent money, so it was left
+deliberately awkward to run by accident, and then it was never run at all.
+
+That is now permanent. The hosted backend has been removed from the app, so the
+arm cannot be re-added without restoring the provider it drove. The honest
+summary of this repository's hosted-versus-local content is therefore: a designed
+comparison, published in full, with no data behind it. Anyone quoting Solvr as
+evidence that on-device beats hosted — or loses to it — is quoting something that
+was never measured.
 
 The first local three-arm comparison was also void, and the reason is worth
 recording: a port race left all three arms talking to the same server, so all
@@ -185,14 +201,13 @@ process.
 # Free: no key, no network, no spend. Validates the whole pipeline.
 cd Packages/SolvrCore && swift run solvr-eval --backend demo --out ../../eval-demo.jsonl
 
-# Billed, and deliberately awkward to run by accident.
-export ANTHROPIC_API_KEY=...
-swift run solvr-eval --backend anthropic             --out ../../eval-uncon.jsonl
-swift run solvr-eval --backend anthropic-constrained --out ../../eval-con.jsonl
+# The real thing. Needs a machine whose on-device model is downloaded and
+# switched on; the harness checks once and stops rather than failing 43 times.
+swift run solvr-eval --backend on-device --out ../../eval-ondevice.jsonl
 
 # Grading and reporting are separate steps, so a saved run can be re-graded
-# without paying for the requests again.
-cd ../.. && tools/eval/grade.sh eval-uncon.jsonl
+# without running the model again.
+cd ../.. && tools/eval/grade.sh eval-ondevice.jsonl
 ```
 
 One-time setup for the graders:

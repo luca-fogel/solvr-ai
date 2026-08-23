@@ -5,9 +5,9 @@ cd "$(dirname "$0")/../.."
 LIMIT="${1:-43}"
 rm -f /tmp/arm-fingerprints.txt
 
-tools/eval/arm.sh eval-base  "local/qwen3-4b-base"     mlx-community/Qwen3-4B-4bit    "$LIMIT"
-tools/eval/arm.sh eval-525   "local/qwen3-4b+lora@525" "$HOME/models/solvr-qwen3-4b-525" "$LIMIT"
-tools/eval/arm.sh eval-tuned "local/qwen3-4b+lora@600" "$HOME/models/solvr-qwen3-4b-600" "$LIMIT"
+tools/finetune/arm.sh eval-base  "local/qwen3-4b-base"     mlx-community/Qwen3-4B-4bit    "$LIMIT"
+tools/finetune/arm.sh eval-525   "local/qwen3-4b+lora@525" "$HOME/models/solvr-qwen3-4b-525" "$LIMIT"
+tools/finetune/arm.sh eval-tuned "local/qwen3-4b+lora@600" "$HOME/models/solvr-qwen3-4b-600" "$LIMIT"
 
 echo
 echo "=== weight fingerprints ==="

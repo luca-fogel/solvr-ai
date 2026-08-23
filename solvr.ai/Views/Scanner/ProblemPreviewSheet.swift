@@ -149,10 +149,23 @@ struct ProblemPreviewSheet: View {
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
-                onload="renderMathInElement(document.body, { delimiters: [{left:'\\\\[',right:'\\\\]',display:true}], throwOnError:false });"></script>
+        \(KaTeXAssets.styleTag)
+        \(KaTeXAssets.scriptTag)
+        <script>
+            // Inlined, not linked. This sheet used to pull KaTeX from
+            // cdn.jsdelivr.net while the rest of the app rendered from the
+            // bundle -- so the scanner preview was the one surface that silently
+            // stopped typesetting without a network, in an app whose whole claim
+            // is that it does not need one. `throwOnError: false` matches
+            // HTMLBuilder: a malformed formula degrades to red text rather than
+            // blanking the sheet.
+            document.addEventListener("DOMContentLoaded", function () {
+                renderMathInElement(document.body, {
+                    delimiters: [{left: '\\\\[', right: '\\\\]', display: true}],
+                    throwOnError: false
+                });
+            });
+        </script>
         <style>
             * { margin:0; padding:0; }
             body { display:flex; align-items:center; justify-content:center; min-height:100%;

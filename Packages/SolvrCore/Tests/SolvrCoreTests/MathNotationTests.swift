@@ -74,33 +74,6 @@ struct MathNotationTests {
     }
 }
 
-@Suite("OpenAI-compatible endpoint URLs")
-struct LocalServerURLTests {
-
-    @Test("a bare host and port gets /v1/chat/completions")
-    func bareHost() {
-        let url = LocalServerProvider.completionsURL(URL(string: "http://127.0.0.1:8131")!)
-        #expect(url.absoluteString == "http://127.0.0.1:8131/v1/chat/completions")
-    }
-
-    @Test("a base already ending in /v1 is not doubled")
-    func versionedBase() {
-        // Moonshot documents https://api.moonshot.ai/v1; appending blindly gives
-        // /v1/v1/chat/completions, which 404s in a way that looks like downtime.
-        let url = LocalServerProvider.completionsURL(URL(string: "https://api.moonshot.ai/v1")!)
-        #expect(url.absoluteString == "https://api.moonshot.ai/v1/chat/completions")
-    }
-
-    @Test("a trailing slash does not change the answer")
-    func trailingSlash() {
-        for base in ["http://127.0.0.1:8131/", "https://api.moonshot.ai/v1/"] {
-            let url = LocalServerProvider.completionsURL(URL(string: base)!)
-            #expect(url.absoluteString.hasSuffix("/v1/chat/completions"))
-            #expect(!url.absoluteString.contains("v1/v1"))
-        }
-    }
-}
-
 /// Fields meant for mathematics that arrive holding a sentence.
 ///
 /// The input below is verbatim from the running app: asked for the algebra of a

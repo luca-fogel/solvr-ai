@@ -6,17 +6,16 @@ import PackageDescription
 // here is Foundation-only on purpose: the moment this imports UIKit, it stops
 // being runnable by `swift test` and the tests stop getting run.
 //
-// The providers live here for a related reason: the evaluation harness has to
-// measure the code the app actually runs, and a harness with its own HTTP client
-// would be measuring a second implementation while reporting the numbers as if
-// they came from the first.
+// The provider lives here for a related reason: the evaluation harness has to
+// measure the code the app actually runs, not a second implementation of it.
+// Since the hosted and self-hosted backends were removed there is only one real
+// provider left -- Apple's on-device model -- and no HTTP client anywhere.
 let package = Package(
     name: "SolvrCore",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "SolvrCore", targets: ["SolvrCore"]),
         .executable(name: "solvr-eval", targets: ["solvr-eval"]),
-        .executable(name: "solvr-distill", targets: ["solvr-distill"]),
     ],
     targets: [
         .target(name: "SolvrCore"),
@@ -24,7 +23,6 @@ let package = Package(
             name: "solvr-eval",
             dependencies: ["SolvrCore"],
             resources: [.copy("problems.json")]),
-        .executableTarget(name: "solvr-distill", dependencies: ["SolvrCore"]),
         .testTarget(name: "SolvrCoreTests", dependencies: ["SolvrCore"]),
     ]
 )

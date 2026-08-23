@@ -7,10 +7,8 @@ Photograph a maths problem. Get the working, and the lesson behind it.
 A native **iOS and Mac Catalyst** app in Swift and SwiftUI. Point the camera at a
 problem — or type it — and it returns step-by-step working with the reason for
 each step, the concept the question was testing, the formulas involved, and a
-chat to keep asking. Behind one interface it can be backed by more than one
-model — a hosted API, a model served on your own machine, or Apple's on-device
-model — with a harness for comparing them that reports what it has and has not
-actually measured.
+chat to keep asking. It runs entirely on **Apple's on-device foundation model**:
+no API key, no server, no network, nothing leaving the device.
 
 ![solvr.ai on iPhone](docs/images/hero.png)
 
@@ -86,30 +84,25 @@ raw JSON containing unescaped LaTeX — exactly what a model sends — and they 
 parsed by the same ladder the network path uses. If that ladder regresses, demo
 mode breaks visibly.
 
-## No key is required to start
+## No key is required, because there is nothing to key
 
-**A fresh install defaults to Apple's on-device model** — no key, no network,
-nothing leaving the device. There is no API-key wall in front of the app: the
-default is chosen per device by `ProviderFactory.firstRunDefault`, which picks the
-first backend that is actually configured rather than a constant. On hardware
-without Apple Intelligence that falls through to a local server if one has been
-set, and only then to the hosted API — because when nothing is configured,
-Settings has to ask for something, and a key is the one thing you can get without
-owning a second machine.
+**The app runs on Apple's on-device model and nothing else.** There is no API-key
+wall, no account, no endpoint to configure, and no setting that changes where an
+answer comes from — because there is only one place it can come from.
 
-Read that alongside *What it does not do*: on-device answering is verified in the
-simulator and has **never completed on a real iPhone**, which reports
-`modelNotReady`. The default spares you a key; it does not yet prove a phone can
-answer offline.
+It did not start this way. Earlier versions could be backed by a hosted API or by
+a model you served yourself, behind one `SolutionProvider` interface. Both are
+gone. What that cost, and what it bought, is written up in
+[docs/backends.md](docs/backends.md); the short version is that the measurement
+work those backends existed for is finished and published, and keeping a
+credential store alive for a comparison that had already been run was the wrong
+trade for an app whose point is that it does not need one.
 
-## Using the hosted API
+If the on-device model cannot run — the device is not eligible, or Apple
+Intelligence is switched off — Settings says so in a sentence, and *Demo mode*
+still drives every screen from bundled fixtures.
 
-Settings → Where answers come from → **Anthropic API**, then paste an
-[Anthropic API key](https://console.anthropic.com/).
-It is stored in the **Keychain**, and if the Keychain write fails the app tells
-you so and stores nothing. There is deliberately no plaintext fallback: an
-earlier version fell back to `UserDefaults` and still reported success, which
-put a secret in a plist while the UI said "Saved".
+## Requirements
 
 Requirements: **Xcode 26**, **iOS 26.2** or later. No package dependencies to
 resolve — the only package is local, in `Packages/`.
@@ -119,12 +112,12 @@ resolve — the only package is local, in `Packages/`.
 ```
 solvr.ai/
   Models/          Codable response types, plus the SwiftData Problem
-  Services/        ProviderFactory, OCRService, CameraManager, KeychainManager
+  Services/        ProviderFactory, OCRService, CameraManager, LegacyCredentialPurge
   ViewModels/      one per screen; none of them know how a request was made
   Views/           Home · Scanner · Results (Steps/Lesson/Formulas/Videos/Chat) · History · Settings
   Utilities/       Theme, HTMLBuilder (KaTeX), PlatformHelper
   DemoMode/        fixtures, the drawn worksheet, launch-argument wiring
-Packages/SolvrCore/  the text handling that is worth testing, and its 76 tests
+Packages/SolvrCore/  the text handling that is worth testing, and its 77 tests
 ```
 
 `SolvrCore` is a local Swift package holding everything that is pure text
@@ -155,7 +148,7 @@ followed by an unescaped quote.
 ## Tests
 
 ```sh
-swift test --package-path Packages/SolvrCore    # 76 tests, ~2s, no simulator
+swift test --package-path Packages/SolvrCore    # 77 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build
 ```
@@ -170,29 +163,34 @@ code. Those two are a local check.
 
 ## What it does not do
 
-- **Not verifiably offline on a device, yet.** Rendering is: there is no CDN
-  reference left in the app and maths renders from the bundle. *Answering* offline
-  works in the simulator through Apple's on-device model — but on a real iPhone
-  that model reports `modelNotReady`, so no solve has ever completed on the
-  device, and on an Apple-silicon host the simulator may be proxying the Mac's own
-  model rather than proving anything about a phone. Treat on-device as built and
-  unproven.
-- **The hosted comparison has never been run.** The
-  constrained-vs-unconstrained hosted method exists in code and no Anthropic call
-  has ever been made by it. Only the local backends have been measured against
-  each other.
+- **Answering on a real device is confirmed; a full offline run is not yet
+  written down here.** The on-device model solves on an iPhone 15 Pro — that is
+  no longer the open question it was, and the README used to say the model
+  reported `modelNotReady` on hardware. Rendering has been offline-clean since
+  KaTeX was vendored, and as of this version so is every other path: there is no
+  `URLSession` left in either target, and `tools/check.sh` fails the build if one
+  reappears. What is not yet recorded is a measured Airplane Mode run, so that
+  claim is not made.
+- **The hosted comparison was never run, and now cannot be.** A
+  constrained-vs-unconstrained hosted method existed in code and no Anthropic
+  call was ever made by it; that backend has since been removed. It was method,
+  never result. Only the local backends were ever measured against each other,
+  and those records are published in full.
 - **The fine-tune is not shipped, because it lost.** See below.
 - **No answer verification.** The app does not check the model's arithmetic. It
   is a tutor's explanation, not a proof assistant, and a wrong step will be
   presented as confidently as a right one.
-- **No accounts, no sync, no telemetry.** History is local to the device via
-  SwiftData. Nothing is uploaded except the problem itself, to the API, when you
-  ask for a solution.
-- **A photograph is harder than typed text, and how much harder depends on the
-  backend.** A backend with native vision reads the image itself. One without --
-  Apple's on-device model has no image input at all -- gets Apple's Vision text
-  recognition instead, which reads printed problems well, handwriting unevenly,
-  and a fraction as two numbers with a line between them. That downgrade is
+- **No accounts, no sync, no telemetry, and now no uploads at all.** History is
+  local to the device via SwiftData, and with the hosted backend gone there is
+  nothing left that sends the problem anywhere. The only outbound link in the app
+  is the YouTube URL you get by tapping a suggested video, which hands off to
+  another app rather than fetching anything itself.
+- **A photograph is harder than typed text, and there is no longer a backend
+  that makes it easier.** Apple's on-device model has no image input at all, so
+  every photo goes through Apple's Vision text recognition first, which reads
+  printed problems well, handwriting unevenly, and a fraction as two numbers with
+  a line between them. The hosted backend used to read the image natively; losing
+  that is the clearest thing this version gives up. That downgrade is
   recorded per backend rather than glossed over, which is why a wrapped provider
   reports itself as `<backend>+ocr`.
 

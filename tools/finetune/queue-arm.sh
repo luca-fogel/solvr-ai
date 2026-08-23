@@ -14,7 +14,7 @@ while pgrep -f 'debug/solvr-eval' >/dev/null 2>&1 || pgrep -f 'mlx_lm.server' >/
 done
 
 echo "=== earlier arms finished; running the 525 checkpoint ==="
-tools/eval/arm.sh eval-525 "local/qwen3-4b+lora@525" tools/finetune/adapters-525 43
+tools/finetune/arm.sh eval-525 "local/qwen3-4b+lora@525" tools/finetune/adapters-525 43
 
 echo "=== all three arms done ==="
 "$HOME/.venvs/solvr-eval/bin/python" tools/eval/report.py \

@@ -14,10 +14,11 @@ For what the app is and how to run it, see the [README](../README.md).
 ## The prompts ask for strict JSON, and mostly get it
 
 Every request asks for a specific JSON shape, matched to a `Codable` type in
-`SolvrCore/Models/`. The prompts live with the provider that sends them --
-`Providers/AnthropicPrompts.swift` for the hosted API, and its own inside each of
-the other backends -- because a prompt is a property of the backend, not of the
-app. The lesson prompt is the most demanding: a title, a topic line, an
+`SolvrCore/Models/`. The prompts live with the provider that sends them -- now only
+`Providers/OnDeviceProvider.swift`, which carries its own -- because a prompt is
+a property of the backend, not of the app. That principle is what made deleting
+the hosted backend a deletion rather than an untangling: its prompts went with
+it. The lesson prompt is the most demanding: a title, a topic line, an
 introduction, an array of sections each with an optional formula, an optional
 note and an optional list of steps, and a closing takeaway.
 
@@ -123,9 +124,11 @@ In order, cheapest first, after the repair:
 Each rung reports itself as a `Provenance` — `.strict`, `.repaired` or
 `.normalised` — where `.strict` means the repair changed nothing at all. That
 distinction is worth carrying: a value that needed rescuing is evidence about the
-prompt, and the app logs it for exactly that reason. It will also be the
-instrument for comparing a hosted model against a local one, where schema
-compliance is the interesting axis.
+prompt, and the app logs it for exactly that reason. It *was* the instrument for
+comparing a self-hosted model against its fine-tune, where schema compliance was
+the interesting axis — and that comparison is the one published result this
+repository has. It is unreachable from the shipping app: guided generation never
+produces a string to repair. The ladder still runs, on the demo fixtures.
 
 Two failure modes return `nil` deliberately rather than something plausible: a
 response truncated by the token limit, and JSON of the wrong shape. A partially
@@ -220,18 +223,19 @@ README with one command.
   step is displayed with the same confidence as a right one, and detecting that
   automatically is a genuinely hard problem, not an oversight.
 - **Handwriting.** Vision reads printed problems well and handwriting unevenly.
-- **The constrained-versus-unconstrained comparison, on the hosted path.** The
-  provider abstraction described above this section is built: three backends
-  behind one protocol — the hosted API, a local OpenAI-compatible server, and
-  Apple's on-device `FoundationModels`. The last of those settles the question
-  this document raises, in the direction the document expected: `@Generable`
-  constrains decoding to a schema, so the repair ladder is *structurally
-  unnecessary* on that path. What has **not** been run is the same comparison on
-  the hosted API, where `usesStructuredOutputs` exists in code and has never
-  made a call. Only the local backends have been measured against each other
-  ([evaluation-local.md](evaluation-local.md)).
-- **Answering on a real device.** On-device solving works in the simulator and
-  reports `modelNotReady` on the phone, so no solve has ever completed on
-  hardware. See the README's *What it does not do*.
+- **The constrained-versus-unconstrained comparison, on the hosted path — and
+  now it never will be.** Three backends were built behind one protocol: the
+  hosted API, a local OpenAI-compatible server, and Apple's on-device
+  `FoundationModels`. The last settles the question this document raises, in the
+  direction the document expected: `@Generable` constrains decoding to a schema,
+  so the repair ladder is *structurally unnecessary* on that path. The same
+  comparison on the hosted API was wired (`usesStructuredOutputs`) and never
+  made a single call — and that backend has since been removed, so the gap is
+  now permanent rather than pending. Only the local backends were ever measured
+  against each other ([evaluation-local.md](evaluation-local.md)).
+- **Grouping OCR lines into multi-line problems.** The scanner detects one
+  recognised line at a time. Deciding which lines belong to the same problem is
+  the obvious next step and is deliberately not attempted, because guessing it
+  is how the previous, model-estimated boxes ended up spanning half a page.
 - **Streaming.** Responses arrive whole, so a long lesson shows a shimmer rather
   than filling in progressively.
