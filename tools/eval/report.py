@@ -13,21 +13,15 @@ import statistics
 import sys
 from collections import defaultdict
 
-# Anthropic list prices, USD per million tokens, as of 2026-08.
-PRICES = {
-    "claude-opus-5": (5.0, 25.0),
-    "claude-sonnet-5": (3.0, 15.0),
-    "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5": (1.0, 5.0),
-    "claude-fable-5": (10.0, 50.0),
-}
+# There was a per-million-token price table here, for the hosted backend. That
+# backend is gone, and it never produced a record: every arm ever published ran
+# on hardware in this room, so every cost this script has ever printed was
+# "n/a". Keeping a price list for a model the app cannot call would be inventing
+# a column rather than reporting one.
 
 
-def price_for(backend):
-    for model, price in PRICES.items():
-        if model in backend:
-            return price
-    return None
+def cost_note(backend):
+    return "n/a (on device)" if "apple-on-device" in backend else "n/a (local)"
 
 
 def load(paths):
@@ -150,8 +144,7 @@ def main():
         p90 = latencies[min(len(latencies) - 1, int(0.9 * len(latencies)))]
         tin = sum(r.get("inputTokens") or 0 for r in rows)
         tout = sum(r.get("outputTokens") or 0 for r in rows)
-        price = price_for(backend)
-        cost = "n/a (local)" if not price else f"${(tin * price[0] + tout * price[1]) / 1e6:.2f}"
+        cost = cost_note(backend)
         print(f"| `{backend}` | {statistics.median(latencies):.2f} | {p90:.2f} | "
               f"{tin or 'n/a'} | {tout or 'n/a'} | {cost} |")
 

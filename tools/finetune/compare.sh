@@ -6,7 +6,7 @@
 # of the numbers is that they are comparable, which they are not if one arm ran
 # against a throttled machine.
 #
-#   tools/eval/compare.sh [problem-limit]
+#   tools/finetune/compare.sh [problem-limit]
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 

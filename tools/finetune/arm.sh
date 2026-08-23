@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One evaluation arm: serve a model and measure it on the problem set.
 #
-#   tools/eval/arm.sh <output-name> <label> <model-path-or-repo> [limit]
+#   tools/finetune/arm.sh <output-name> <label> <model-path-or-repo> [limit]
 #
 # Takes a model rather than an adapter, deliberately. mlx_lm.server 0.31.3 accepts
 # --adapter-path and silently ignores it: server.py resolves model_path through
@@ -16,8 +16,8 @@ cd "$(dirname "$0")/../.."
 OUT="${1:?output name}"; LABEL="${2:?label}"; MODEL="${3:?model}"; LIMIT="${4:-43}"
 PORT=8131
 
-PID=$(tools/eval/serve-exclusively.sh "$PORT" "$MODEL" "")
-FP=$(python3 tools/eval/fingerprint.py "http://127.0.0.1:$PORT" "$MODEL")
+PID=$(tools/finetune/serve-exclusively.sh "$PORT" "$MODEL" "")
+FP=$(python3 tools/finetune/fingerprint.py "http://127.0.0.1:$PORT" "$MODEL")
 echo "  serving $MODEL as pid $PID · fingerprint $FP"
 echo "$FP  $OUT  $MODEL" >> /tmp/arm-fingerprints.txt
 

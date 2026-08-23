@@ -155,7 +155,7 @@ followed by an unescaped quote.
 ## Tests
 
 ```sh
-swift test --package-path Packages/SolvrCore    # 76 tests, ~2s, no simulator
+swift test --package-path Packages/SolvrCore    # 73 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build
 ```
