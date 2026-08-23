@@ -93,7 +93,9 @@ struct ContentView: View {
                 await openDemoScreenIfRequested()
                 // Loading the on-device model is the expensive part of the first
                 // solve. Warming it while the user is still typing hides that.
-                if !DemoMode.isEnabled, ProviderFactory.selectedBackend == .appleOnDevice {
+                // No backend check any more: on-device is the only one there is,
+                // and `prewarm()` already returns early if the model cannot run.
+                if !DemoMode.isEnabled {
                     ProviderFactory.onDevice.prewarm()
                 }
                 if OnDeviceSelfTest.isRequested {

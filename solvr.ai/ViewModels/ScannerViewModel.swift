@@ -18,8 +18,6 @@ final class ScannerViewModel {
     var selectedProblem: DetectedProblem?
     var errorMessage: String?
 
-    private let api = ProviderFactory.anthropic()
-
     // MARK: - Capture
 
     func capturePhoto(from cameraManager: CameraManager) {
@@ -48,10 +46,7 @@ final class ScannerViewModel {
 
         Task {
             do {
-                guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
-                    throw SolverError.invalidResponse
-                }
-                let rawProblems = try await api.detectProblems(inImageJPEG: jpeg)
+                let rawProblems = try await OCRService.detectProblems(from: image)
                 let validated = Self.validateBoundingBoxes(rawProblems)
                 let problems = Self.filterDetectedProblems(validated)
                 await MainActor.run {

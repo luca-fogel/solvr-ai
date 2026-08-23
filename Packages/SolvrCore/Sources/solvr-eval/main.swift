@@ -25,10 +25,6 @@ struct Options {
     var backend = "demo"
     var limit: Int?
     var output = "eval-results.jsonl"
-    var model = "claude-opus-5"
-    var keyEnv = "ANTHROPIC_API_KEY"
-    var maxTokens = 2048
-    var baseURL: String?
 }
 
 func parseOptions() -> Options {
@@ -48,32 +44,26 @@ func parseOptions() -> Options {
         case "--backend": o.backend = value()
         case "--limit": o.limit = Int(value())
         case "--out": o.output = value()
-        case "--model": o.model = value()
-        case "--key-env": o.keyEnv = value()
-        case "--max-tokens": o.maxTokens = Int(value()) ?? o.maxTokens
-        case "--base-url": o.baseURL = value()
         case "--help", "-h":
             print("""
-            solvr-eval --backend <demo|anthropic|anthropic-constrained>
-                       [--limit N] [--out file.jsonl] [--model ID]
-                       [--key-env VAR] [--max-tokens N]
+            solvr-eval --backend <demo|on-device> [--limit N] [--out file.jsonl]
 
             Backends:
-              demo                    bundled fixtures, no key, no network, no spend
-              local                   an OpenAI-compatible endpoint you run, via
-                                      --base-url and --model. This is how the
-                                      fine-tuned model is measured, and the one
-                                      backend that cannot be schema-constrained
-                                      by mlx_lm.server -- so the repair ladder is
-                                      load-bearing here and nowhere else.
-              anthropic               the hosted API as the app calls it today,
-                                      asking the prompt for JSON
-              anthropic-constrained   the same prompt plus output_config.format,
-                                      so the API guarantees the shape
+              demo        bundled fixtures. No model, no network, no spend. Still
+                          worth running: the fixtures are decoded through the same
+                          LLMJSON ladder as everything else, so this arm measures
+                          the pipeline even though it does not measure a model.
+              on-device   Apple's on-device foundation model, via guided
+                          generation -- the only backend the app ships.
 
-            The two anthropic arms differ in exactly one thing: the decoding
-            mechanism. The prompt is identical, deliberately, so the comparison
-            measures one change rather than two.
+            The hosted and self-hosted arms are gone with the backends they drove.
+            The records they produced are kept, and published, in docs/eval-records/:
+            a measurement does not stop being true because the code that made it
+            was deleted. See docs/evaluation.md for what they say.
+
+            Note what on-device does NOT report: input and output token counts.
+            FoundationModels exposes no usage block, so those fields are null
+            rather than estimated. An invented number is worse than a gap.
             """)
             exit(0)
         default:
@@ -142,16 +132,17 @@ struct Record: Encodable {
 
 /// Collects what the provider reports about each request, keyed by surface.
 actor Telemetry {
-    private var latest: [String: AnthropicProvider.Measurement] = [:]
     private var fixtureCompliance: [String: LLMJSON.Compliance] = [:]
 
-    func record(_ m: AnthropicProvider.Measurement) { latest[m.surface] = m }
     func record(_ surface: String, _ c: LLMJSON.Compliance) { fixtureCompliance[surface] = c }
 
+    /// Compliance, input tokens, output tokens.
+    ///
+    /// All three are absent for the on-device arm, and that is the honest answer
+    /// rather than a missing feature: guided generation never produces a string
+    /// to repair, so there is no compliance ladder to report, and
+    /// FoundationModels exposes no usage block, so there are no tokens to count.
     func take(_ surface: String) -> (LLMJSON.Compliance?, Int?, Int?) {
-        if let m = latest.removeValue(forKey: surface) {
-            return (m.compliance, m.inputTokens, m.outputTokens)
-        }
         if let c = fixtureCompliance.removeValue(forKey: surface) {
             return (c, nil, nil)
         }
@@ -194,39 +185,31 @@ case "demo":
     provider = FixtureSolutionProvider(latency: .zero) { surface, compliance in
         Task { await telemetry.record(surface, compliance) }
     }
-case "anthropic", "anthropic-constrained":
-    guard let key = ProcessInfo.processInfo.environment[options.keyEnv], !key.isEmpty else {
+case "on-device":
+    #if canImport(FoundationModels)
+    guard #available(macOS 26.0, *) else {
+        FileHandle.standardError.write(Data("--backend on-device needs macOS 26 or newer\n".utf8))
+        exit(1)
+    }
+    let onDevice = OnDeviceProvider()
+    // Availability is checked once, before the run, so an ineligible machine
+    // fails in one line rather than in 43 identical ones.
+    if let unavailable = onDevice.availability {
+        let reason = unavailable.errorDescription ?? "unknown"
         FileHandle.standardError.write(Data("""
-            \(options.keyEnv) is not set.
+            on-device model unavailable: \(reason)
 
-            This backend makes real, billed requests. Export the key deliberately:
-              export \(options.keyEnv)=...
-            Or run --backend demo, which measures the whole pipeline for free.
+            This is a property of the machine, not of the harness. The model has to
+            be downloaded and Apple Intelligence switched on before it can answer.
 
             """.utf8))
         exit(1)
     }
-    provider = AnthropicProvider(
-        configuration: .init(model: options.model,
-                             maxTokens: options.maxTokens,
-                             usesStructuredOutputs: options.backend == "anthropic-constrained"),
-        apiKey: { key },
-        isOnline: { true },
-        observe: { m in Task { await telemetry.record(m) } })
-case "local", "local-constrained":
-    guard let raw = options.baseURL, let url = URL(string: raw) else {
-        FileHandle.standardError.write(Data("--backend local requires --base-url\n".utf8))
-        exit(1)
-    }
-    provider = LocalServerProvider(
-        configuration: .init(baseURL: url,
-                             model: options.model,
-                             maxTokens: options.maxTokens,
-                             timeout: 300,
-                             bearerToken: ProcessInfo.processInfo
-                                 .environment["SOLVR_LOCAL_TOKEN"],
-                             usesResponseFormat: options.backend == "local-constrained"),
-        observe: { m in Task { await telemetry.record(m) } })
+    provider = onDevice
+    #else
+    FileHandle.standardError.write(Data("this build has no FoundationModels\n".utf8))
+    exit(1)
+    #endif
 default:
     FileHandle.standardError.write(Data("unknown backend \(options.backend)\n".utf8))
     exit(2)

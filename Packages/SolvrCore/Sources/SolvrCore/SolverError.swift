@@ -8,36 +8,33 @@ import Foundation
 /// their type signatures, so the *demo* path -- which makes no network calls at
 /// all -- could not compile without the HTTP client.
 ///
-/// The cases are deliberately about what the user experiences rather than about
-/// which backend produced them. A refused key, an exhausted context window and a
-/// model that has not finished downloading are three different conversations to
-/// have with someone, and only the first is anyone's fault.
+/// Six HTTP-shaped cases were removed with the hosted backend: a missing key, a
+/// rejected key, an empty body, no connection, a timeout, and a 5xx. None of them
+/// can happen to a model running on the same silicon as the app, and every one of
+/// them was unreachable once the last URLSession went. What is left describes
+/// what the *user* experiences, which is the distinction that made this enum
+/// worth extracting in the first place: a model that has not finished downloading
+/// and an exhausted context window are two different conversations to have with
+/// someone, and neither is their fault.
 public enum SolverError: LocalizedError, Equatable, Sendable {
-    /// No credential is stored for a backend that needs one.
-    case noAPIKey
-    /// A credential exists and was rejected.
-    case unauthorized
     case invalidResponse
+    /// A failure the framework reported that we have no better name for. Carries
+    /// the underlying description so it is not lost.
     case apiError(String)
-    case emptyResponse
-    case networkUnavailable
-    case timeout
+    /// The model refused concurrent work and wants to be asked again. On-device
+    /// generation serialises, so this is a queueing signal rather than a quota.
     case rateLimited(retryAfter: TimeInterval?)
-    case serverError(statusCode: Int)
     /// The response arrived but could not be read as the shape we asked for.
     /// `context` carries "<surface>: <detail>" so the user sees the surface and
     /// the log keeps the detail.
     case decodingFailed(context: String)
-
-    // The three below exist for backends that are not a hosted HTTP API.
-
-    /// The selected backend cannot run here at all -- the device is not eligible,
-    /// the feature is switched off, the local server is unreachable. `reason` is
-    /// shown to the user, so it has to be a sentence rather than an enum name.
+    /// The model cannot run here at all -- the device is not eligible, or Apple
+    /// Intelligence is switched off. `reason` is shown to the user, so it has to
+    /// be a sentence rather than an enum name.
     case backendUnavailable(reason: String)
-    /// The backend exists and will work, but not yet: an on-device model still
-    /// downloading, or a Mac still waking. Distinct from `backendUnavailable`
-    /// because the honest advice is "try again shortly" rather than "change this".
+    /// The model exists and will work, but not yet: still downloading, or still
+    /// being prepared by the system. Distinct from `backendUnavailable` because
+    /// the honest advice is "try again shortly" rather than "change this".
     case modelNotReady
     /// Prompt plus completion did not fit the model's context window. Worth its
     /// own case because the fix is ours, not the user's.
@@ -45,33 +42,21 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .noAPIKey:
-            return "No API key found. Please add your API key in Settings."
-        case .unauthorized:
-            return "That API key was rejected. Please check your key in Settings."
         case .invalidResponse:
-            return "Received an invalid response from the server."
+            return "The model returned something that could not be read."
         case .apiError(let message):
-            return "API Error: \(message)"
-        case .emptyResponse:
-            return "Received an empty response."
-        case .networkUnavailable:
-            return "No internet connection. Please check your network and try again."
-        case .timeout:
-            return "The request timed out. Please try again."
+            return message
         case .rateLimited:
-            return "Too many requests. Please wait a moment and try again."
-        case .serverError(let statusCode):
-            return "Server error (\(statusCode)). Please try again later."
+            return "The model is busy with another part of this problem. Try again in a moment."
         case .decodingFailed(let context):
             let label = context.components(separatedBy: ":").first ?? context
-            return "Could not parse \(label). The AI response was in an unexpected format. Try again."
+            return "Could not parse \(label). The response was in an unexpected format. Try again."
         case .backendUnavailable(let reason):
             return reason
         case .modelNotReady:
             return "The model is still getting ready. Please try again in a moment."
         case .contextExceeded:
-            return "This problem was too long for the selected model. Try a shorter problem, or switch backend in Settings."
+            return "This problem was too long for the on-device model. Try a shorter problem."
         }
     }
 
@@ -90,11 +75,7 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
 
     public var icon: String {
         switch self {
-        case .noAPIKey, .unauthorized: return "key.slash.fill"
-        case .networkUnavailable: return "wifi.slash"
-        case .timeout: return "clock.badge.exclamationmark"
         case .rateLimited: return "gauge.with.dots.needle.67percent"
-        case .serverError: return "server.rack"
         case .decodingFailed: return "doc.questionmark.fill"
         case .backendUnavailable: return "cpu"
         case .modelNotReady: return "hourglass"
@@ -105,17 +86,11 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
 
     public var title: String {
         switch self {
-        case .noAPIKey: return "API Key Missing"
-        case .unauthorized: return "Invalid API Key"
-        case .networkUnavailable: return "You're Offline"
-        case .timeout: return "Request Timed Out"
-        case .rateLimited: return "Too Many Requests"
-        case .serverError: return "Server Error"
+        case .invalidResponse: return "Unreadable Response"
+        case .apiError: return "Something Went Wrong"
+        case .rateLimited: return "Model Busy"
         case .decodingFailed: return "Parsing Error"
-        case .invalidResponse: return "Invalid Response"
-        case .apiError: return "API Error"
-        case .emptyResponse: return "Empty Response"
-        case .backendUnavailable: return "Backend Unavailable"
+        case .backendUnavailable: return "Model Unavailable"
         case .modelNotReady: return "Model Not Ready"
         case .contextExceeded: return "Problem Too Long"
         }

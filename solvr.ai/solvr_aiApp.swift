@@ -15,6 +15,9 @@ struct solvr_aiApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    LegacyCredentialPurge.runIfNeeded()
+                }
                 #if targetEnvironment(macCatalyst)
                 .onAppear {
                     configureMacWindow()
