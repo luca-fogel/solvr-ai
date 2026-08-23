@@ -209,6 +209,8 @@ default.
   the package, and where the JSON repair ladder actually earns its keep
 - [docs/evaluation.md](docs/evaluation.md) — how the backends are measured, what
   has and has not actually been run, and what is deliberately not measured
+- [docs/eval-records/](docs/eval-records/) — the 387 graded records behind every
+  number above, with the one command that regenerates the tables from them
 - [tools/finetune/README.md](tools/finetune/README.md) — the LoRA run on a 4B:
   synthetic problem generation, distillation, and the checkpoint-numbering trap
   that made "iteration 525" mean something other than it looks like
