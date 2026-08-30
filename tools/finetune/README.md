@@ -93,8 +93,31 @@ Rules, not preferences:
 - **The held-out split must be disjoint from the evaluation problems** in
   `Packages/SolvrCore/Sources/solvr-eval/problems.json`. If the eval set leaks
   into training, the headline number means nothing.
-- Every assistant message must **parse and render**: pipe the dataset through the
-  same graders the eval uses (`tools/eval/grade.sh`) before training on it.
+- Every assistant message must **parse and render**: `validate_targets.mjs`
+  drops any example whose LaTeX will not render under KaTeX.
+- **And the maths in it must be right**, which is a separate rule that went
+  unenforced through the whole published run. The bullet above was read as
+  covering it — the problem generator's own docstring says "the graders check
+  it" — and the graders were only ever pointed at evaluation *responses*. The
+  only check on the teacher's arithmetic was a hand-checked sample of five.
+
+  `check_targets.py` closes that. The problems are templated, so it solves them
+  itself and grades the teacher against its own answer rather than trusting it:
+
+  ```sh
+  ~/.venvs/solvr-eval/bin/python tools/finetune/check_targets.py data/raw.jsonl
+  ```
+
+  On the published dataset: **169 of 169 decided targets are correct**, over the
+  62% of steps targets whose template it can solve. So the data was fine — but
+  that is a measurement now rather than an assumption, and it is one of the four
+  explanations for the fine-tune's correctness regression that had to be ruled
+  out before the remaining one could be believed.
+
+  It also reports something small and real: 95% of targets state the answer in
+  the last step as the prompt asks, and the other 5% append a verification step,
+  so anything reading "the last step" gets `4(7) + 9 = 28 + 9 = 37` for a problem
+  whose answer is 7.
 
 ## Training
 
@@ -137,6 +160,25 @@ result: constrained decoding is free compliance, and self-hosting gives it up.
 pedagogy — section structure, step decomposition, renderable LaTeX — and is
 expected to **lose on reasoning**. Both are measured. If it loses, the write-up
 says by how much.
+
+It lost, and the write-up says by how much:
+[evaluation-local.md](../../docs/evaluation-local.md).
+
+```sh
+tools/finetune/compare-arms.sh 43     # base, @225, @525, @600 — about an hour
+```
+
+Four arms, not three. The first comparison measured only late checkpoints, so it
+could not distinguish "this damages correctness" from "this damages correctness
+when trained for two and a half epochs". Cumulative 225 is one epoch and survives
+on disk ([provenance](adapters-225/PROVENANCE.md)), and it answers the question:
+**the compliance gain and the correctness loss both arrive within the first
+epoch.** There is no early checkpoint that keeps one without the other.
+
+The script refuses to print a report unless all four arms show distinct weight
+fingerprints. That guard exists because a port race once had three arms talking
+to the same server and produced 129 byte-identical outputs with a table that
+looked entirely plausible.
 
 ## Pipeline verified 2026-08-22, before any data was generated
 

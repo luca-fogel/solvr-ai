@@ -1,12 +1,12 @@
 # Graded evaluation records
 
 The evidence for every number in [evaluation-local.md](../evaluation-local.md)
-and for the fine-tune table in the [README](../../README.md). 387 records: 43
+and for the fine-tune table in the [README](../../README.md). 516 records: 43
 held-out problems across three surfaces (`steps`, `lesson`, `formulas`) for each
-of three arms.
+of four arms.
 
 Published because a result that cannot be checked is an assertion. The tables
-regenerate from these three files and nothing else:
+regenerate from these four files and nothing else:
 
 ```sh
 python3 tools/eval/report.py docs/eval-records/*.graded.jsonl \
@@ -27,12 +27,28 @@ be inferred, for the same reason as
 | file | `backend` | what it is | records |
 | --- | --- | --- | --- |
 | `eval-base.graded.jsonl` | `local/qwen3-4b-base` | untuned `Qwen3-4B-4bit` | 129 |
+| `eval-225.graded.jsonl` | `local/qwen3-4b+lora@225` | cumulative iteration 225 — one epoch, the earliest checkpoint that survives | 129 |
 | `eval-525.graded.jsonl` | `local/qwen3-4b+lora@525` | cumulative iteration 525, best validation loss | 129 |
 | `eval-tuned.graded.jsonl` | `local/qwen3-4b+lora@600` | cumulative iteration 600, end of training | 129 |
 
-All three arms were verified to be serving different weights before the run was
+All four arms were verified to be serving different weights before the run was
 believed — an earlier attempt produced 129/129 byte-identical outputs from what
 was supposed to be three models, and a report that looked entirely plausible.
+`check.sh` now asserts it structurally as well: no two arms may have produced the
+same set of answers.
+
+## This is a re-run, and it reproduced
+
+These records are from **2026-08-30**, not from the original 2026-08-23 run. The
+self-hosted arm had been deleted along with the hosted backend, which quietly
+made the published comparison unreproducible; restoring it meant re-measuring
+everything rather than adding one arm to records nothing could regenerate.
+
+It reproduced. The weight fingerprints are identical to the originals —
+`66aedf03` base, `0736b654` @525, `9e249e06` @600 — and base maths correctness
+came out 32/42 against the original 31/42. The @525 arm moved more, 25/43 to
+27/43, which is what a re-run of a 43-problem set looks like and is why 43 is
+reported as 43 rather than presented as precision it does not have.
 
 ## Schema
 

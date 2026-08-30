@@ -315,28 +315,54 @@ to be right. That is the honest shape of this path, and it is
 ## What the fine-tune actually did
 
 A LoRA on Qwen3-4B, trained on synthetic problems distilled from a larger model,
-then measured against its own base over 43 problems and 387 records
-([docs/evaluation-local.md](docs/evaluation-local.md)):
+then measured against its own base over 43 problems and 516 records
+([docs/evaluation-local.md](docs/evaluation-local.md)). **Four arms**, because
+the first three were all late in training and could not tell "this damages
+correctness" from "this damages correctness when trained for two and a half
+epochs":
 
-| | base | +LoRA @525 | +LoRA @600 |
-|---|---|---|---|
-| schema clean — steps | 86% | 88% | **93%** |
-| schema clean — lesson | 88% | **98%** | 95% |
-| schema clean — formulas | **60%** | 50% | 56% |
-| **maths correct** | **74%** | 58% | 55% |
-| thin answers (≤1 step) | **8/42** | 18/43 | 17/42 |
-| LaTeX renders | 97% | 97% | 97% |
+| | base | +LoRA @225 | +LoRA @525 | +LoRA @600 |
+|---|---|---|---|---|
+| | | *≈1 epoch* | | *end* |
+| schema clean — steps | 88% | **95%** | 93% | **95%** |
+| schema clean — lesson | 90% | **98%** | **98%** | **98%** |
+| schema clean — formulas | **60%** | 57% | 50% | 56% |
+| **maths correct** | **76%** | 63% | 63% | 57% |
+| thin answers (≤1 step) | **8/42** | 17/43 | 18/43 | 17/42 |
+| LaTeX renders | 99% | 99% | 99% | 99% |
 
-**It learned exactly what it was trained to learn, and that was not what I
-wanted.** Compliance improved on the two prose-heavy surfaces, and escape repairs
-fell. Correctness fell nineteen points, and the step-count distribution says why:
-the tuned model emits **one compliant step instead of working the problem**. Thin
-answers more than doubled, and undecidable answers went 4 → 10, because a
-one-step answer often has no parseable result in it.
+**Everything the fine-tune does, it has already done after one epoch — the good
+and the bad.** Compliance on the two prose-heavy surfaces reaches its ceiling at
+@225 and does not move again. Thin answers have already doubled at @225. And
+correctness has already fallen thirteen points at @225, on its way to nineteen.
 
-Format overfitting, and 0.091% of the weights was enough to do it. The
-uncomfortable part is the metric: **schema compliance cannot see this failure at
-all** — a one-step solution that decodes cleanly scores a perfect 100%. The
+That kills the obvious remedy. "Train less" was the reading the earlier
+three-arm run invited, and it is wrong: there is no early checkpoint that keeps
+the compliance and the correctness, because the trade is made in the first pass
+over the data.
+
+Three other explanations were checked and are also dead, each with a
+measurement rather than an argument:
+
+- **The targets are not thin.** Steps per training target:
+  `{3:17, 4:75, 5:126, 6:40, 7:10, 8:3}` — minimum three, median five. The
+  handover proposed filtering the data on step count; there is nothing to filter.
+- **Nothing is truncated.** `max_seq_length: 1792` against a measured maximum of
+  1,725 tokens and a p99 of 1,602.
+- **The maths in the training data is right.** Nobody had ever checked — the
+  target validator checks that LaTeX *renders*, and the answer graders had only
+  ever been run on evaluation responses. `tools/finetune/check_targets.py` solves
+  the templated problems itself and grades the teacher: **169 of 169 decided
+  targets arrive at the correct answer**, over the 62% of them it can solve.
+
+So the original diagnosis stands, and now it stands on eliminated alternatives
+instead of on one observation. It is format overfitting: with `mask_prompt: true`
+the loss rewards producing the right *shape*, 0.091% of the weights is enough to
+learn the shape at the expense of the content, and the model emits **one
+compliant step instead of working the problem**.
+
+The uncomfortable part is the metric. **Schema compliance cannot see this failure
+at all** — a one-step solution that decodes cleanly scores a perfect 100%. The
 completeness column is the only reason it was caught, which is an argument for
 measuring the thing you want rather than the thing that is easy to count.
 
@@ -344,13 +370,16 @@ One more result worth keeping: validation loss said @525 was far better than @60
 (0.338 vs 0.497) and the task metrics called them a tie. A validation loss on two
 batches predicted nothing that mattered.
 
-**Recommendation, taken: do not ship it.** Base Qwen3-4B is better overall. What
-stays in the repo is the negative result and everything needed to reproduce it —
-the training config, the problem generator, the adapter's
-`adapter_config.json`, the checkpoint provenance, and the graded records behind
-every number above ([docs/eval-records/](docs/eval-records/)). The 14 MB of
-adapter weights are **not** tracked: they are a build product, and
-`tools/finetune/train.sh` rebuilds them from the config.
+**Recommendation, unchanged and now better founded: do not ship it.** The
+criterion was fixed before the run — an arm ships only if maths correctness is at
+least base's and schema compliance on steps and lesson is at least base's. @225
+meets the second half and misses the first by thirteen points. What stays in the
+repo is the negative result and everything needed to reproduce it: the training
+config, the problem generator, the target checker, each adapter's
+`adapter_config.json` and provenance, and the graded records behind every number
+above ([docs/eval-records/](docs/eval-records/)). The 14 MB of adapter weights
+are **not** tracked: they are a build product, and `tools/finetune/train.sh`
+rebuilds them from the config.
 
 ## Documentation
 

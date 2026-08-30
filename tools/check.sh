@@ -95,10 +95,17 @@ note "Every record is parseable and accounted for"
 python3 - <<'PY' || fail=1
 import glob, json
 recs = [json.loads(l) for f in glob.glob("docs/eval-records/*.graded.jsonl") for l in open(f)]
-assert len(recs) == 387, len(recs)
+assert len(recs) == 516, len(recs)
 assert len({r["problemId"] for r in recs}) == 43
-assert len({r["backend"] for r in recs}) == 3
-print(f"{len(recs)} records, 43 problems, 3 arms")
+assert len({r["backend"] for r in recs}) == 4
+# Every arm must have served different weights. Three arms once produced 129
+# byte-identical responses because a port race left them all talking to one
+# server, and the report looked entirely plausible.
+answers = {b: tuple(sorted((r["problemId"], r["surface"], str(r.get("finalAnswer")))
+                           for r in recs if r["backend"] == b))
+           for b in {r["backend"] for r in recs}}
+assert len(set(answers.values())) == 4, "two arms produced identical responses"
+print(f"{len(recs)} records, 43 problems, 4 arms, none of them each other")
 PY
 
 # The app is supposed to be unable to phone home. That is a property worth

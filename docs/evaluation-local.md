@@ -11,6 +11,7 @@ generation returns a typed value, so the ladder is unreachable.
 
 | backend | steps | lesson | formulas |
 |---|---|---|---|
+| `local/qwen3-4b+lora@225` | 95% (39/41) | 98% (42/43) | 57% (24/42) |
 | `local/qwen3-4b+lora@525` | 93% (38/41) | 98% (42/43) | 50% (21/42) |
 | `local/qwen3-4b+lora@600` | 95% (39/41) | 98% (41/42) | 56% (24/43) |
 | `local/qwen3-4b-base` | 88% (36/41) | 90% (38/42) | 60% (26/43) |
@@ -19,6 +20,9 @@ generation returns a typed value, so the ladder is unreachable.
 
 | backend | surface | fenced | prose sliced | escapes repaired | renormalised | failed to parse |
 |---|---|---|---|---|---|---|
+| `local/qwen3-4b+lora@225` | steps | 0 | 0 | 2 | 0 | 0 |
+| `local/qwen3-4b+lora@225` | lesson | 0 | 0 | 1 | 0 | 0 |
+| `local/qwen3-4b+lora@225` | formulas | 0 | 0 | 18 | 0 | 1 |
 | `local/qwen3-4b+lora@525` | steps | 0 | 0 | 3 | 0 | 0 |
 | `local/qwen3-4b+lora@525` | lesson | 0 | 0 | 1 | 0 | 0 |
 | `local/qwen3-4b+lora@525` | formulas | 0 | 0 | 21 | 0 | 1 |
@@ -36,9 +40,10 @@ needs a human, not that the answer was wrong.
 
 | backend | correct | wrong | undecidable |
 |---|---|---|---|
-| `local/qwen3-4b+lora@525` | 58% (25/43) | 8 | 10 |
-| `local/qwen3-4b+lora@600` | 55% (23/42) | 9 | 10 |
-| `local/qwen3-4b-base` | 74% (31/42) | 7 | 4 |
+| `local/qwen3-4b+lora@225` | 63% (27/43) | 15 | 1 |
+| `local/qwen3-4b+lora@525` | 63% (27/43) | 15 | 1 |
+| `local/qwen3-4b+lora@600` | 57% (24/42) | 17 | 1 |
+| `local/qwen3-4b-base` | 76% (32/42) | 10 | 0 |
 
 ## Completeness: how much came back
 
@@ -49,6 +54,7 @@ learns to answer tersely would look like an improvement.
 
 | backend | steps | lesson sections | formulas | thin (<=1 step) |
 |---|---|---|---|---|
+| `local/qwen3-4b+lora@225` | 2 | 3 | 6 | 17/43 |
 | `local/qwen3-4b+lora@525` | 3 | 3 | 6 | 18/43 |
 | `local/qwen3-4b+lora@600` | 3 | 3 | 6 | 17/42 |
 | `local/qwen3-4b-base` | 3 | 3 | 6 | 8/42 |
@@ -61,9 +67,10 @@ so in production these failures are silent.
 
 | backend | strings checked | render | fail |
 |---|---|---|---|
-| `local/qwen3-4b+lora@525` | 491 | 97% (476) | 15 |
-| `local/qwen3-4b+lora@600` | 492 | 97% (478) | 14 |
-| `local/qwen3-4b-base` | 501 | 97% (487) | 14 |
+| `local/qwen3-4b+lora@225` | 485 | 99% (478) | 7 |
+| `local/qwen3-4b+lora@525` | 491 | 99% (484) | 7 |
+| `local/qwen3-4b+lora@600` | 492 | 99% (485) | 7 |
+| `local/qwen3-4b-base` | 501 | 99% (494) | 7 |
 
 ## Latency and cost
 
@@ -74,8 +81,9 @@ there is no first token to time.
 
 | backend | median s | p90 s | in tok | out tok | est. USD |
 |---|---|---|---|---|---|
-| `local/qwen3-4b+lora@525` | 7.76 | 13.15 | 32209 | 52009 | n/a (local) |
-| `local/qwen3-4b+lora@600` | 7.35 | 12.32 | 32083 | 51689 | n/a (local) |
-| `local/qwen3-4b-base` | 6.86 | 11.17 | 32089 | 51032 | n/a (local) |
+| `local/qwen3-4b+lora@225` | 7.03 | 11.65 | 31643 | 49761 | n/a (local) |
+| `local/qwen3-4b+lora@525` | 7.66 | 12.89 | 31654 | 51663 | n/a (local) |
+| `local/qwen3-4b+lora@600` | 5.78 | 9.25 | 31494 | 50630 | n/a (local) |
+| `local/qwen3-4b-base` | 7.42 | 12.32 | 31506 | 49982 | n/a (local) |
 
-Records: 387. Problems: 43.
+Records: 516. Problems: 43.

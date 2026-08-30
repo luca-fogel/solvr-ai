@@ -146,7 +146,11 @@ def main():
     # Only for runs whose records carry the before-and-after pair. Older records
     # do not, and a column of zeroes computed from a field that is not there
     # would read as a measurement rather than as its absence.
-    if any("convertedMath" in r for r in records):
+    # Only where the before *and* after were both recorded. Every record carries
+    # the field, so its presence proves nothing, and a backend that never calls
+    # the converter -- or a run that predates the pairing -- would otherwise get
+    # a table of zeroes that reads as "we checked and it was fine".
+    if any(r.get("convertedMath") for r in records):
         print("\n## What the notation converter did to maths that was already valid\n")
         print("Every maths field is recorded twice: as the model wrote it, and as")
         print("`MathNotation` rewrote it for display. This counts the strings KaTeX")
