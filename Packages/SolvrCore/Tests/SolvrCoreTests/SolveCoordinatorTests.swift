@@ -16,15 +16,8 @@ struct SolveCoordinatorTests {
     private static let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x01, 0x02, 0x03])
     private static let recognised = "∫ 3x^2 + 2x + 4 dx"
 
-    /// A provider that answers instantly and remembers what it was asked.
-    private static func spy() -> RecordingProvider { RecordingProvider() }
-
-    /// The app's wiring: `ProviderFactory.current()` builds a fresh
-    /// `SightedProvider` on every call, so the recogniser it closes over is
-    /// resolved per request, not per solve.
-    private static func factory(_ spy: RecordingProvider,
-                                recogniser: OCRCounter) -> @Sendable () -> any SolutionProvider {
-        { SightedProvider(wrapping: spy) { _ in await recogniser.read(recognised) } }
+    private static func builder(_ ocr: OCRCounter) -> SolveBuilder {
+        SolveBuilder { _ in await ocr.read(recognised) }
     }
 
     // MARK: - The bug in the screenshots
@@ -32,27 +25,24 @@ struct SolveCoordinatorTests {
     /// A photographed problem, backed out of and re-opened from History, must
     /// not ask the model about whatever string was on screen at the time.
     ///
-    /// `Problem` has one text field and it holds a *label* -- "Scanning...",
-    /// "[Scanned Image]", or a model-written title. Re-opening the entry and
-    /// touching a surface that was never fetched the first time re-asks with
-    /// that label as the problem, and the label is the only thing the model ever
-    /// sees.
+    /// The history entry used to hold one text field, and that field held a
+    /// *label*: "Scanning...", "[Scanned Image]", or a model-written title. It
+    /// now holds the question as well, so re-opening the entry and touching a
+    /// surface that was never fetched asks about the problem.
     @Test("a solve re-opened from history asks about the problem, not its label")
-    func historyDoesNotAskAboutTheLabel() async {
-        let spy = Self.spy()
+    func historyDoesNotAskAboutTheLabel() async throws {
+        let spy = RecordingProvider()
         let ocr = OCRCounter()
-        let coordinator = SolveCoordinator(provider: Self.factory(spy, recogniser: ocr))
+        let coordinator = SolveCoordinator(provider: { spy })
 
-        coordinator.solveFromImage(jpeg: Self.jpeg, placeholder: "Scanning...")
+        let solve = try await Self.builder(ocr).photograph(Self.jpeg)
+        coordinator.begin(solve)
         await coordinator.settle()
 
-        // The user backs out. The app saves what it was showing, because that is
-        // the only field the history entry has.
-        let saved = coordinator.problemTitle.isEmpty ? coordinator.currentProblem
-                                                     : coordinator.problemTitle
-        coordinator.loadFromHistory(text: saved,
-                                    stepsJSON: nil, lessonJSON: nil,
-                                    formulasJSON: nil, videosJSON: nil)
+        // The user backs out. What is saved is the solve, question included --
+        // there is no longer a way to save only the label.
+        coordinator.restore(solve, stepsJSON: nil, lessonJSON: nil,
+                            formulasJSON: nil, videosJSON: nil)
 
         // ...and opens the Lesson tab, which was never fetched.
         coordinator.ensureLoaded(.lesson)
@@ -62,14 +52,31 @@ struct SolveCoordinatorTests {
         #expect(asked == Self.recognised, "the lesson was asked about \(asked)")
     }
 
+    /// A history entry from before the question was recorded cannot be
+    /// re-asked, and must say so rather than guess.
+    @Test("an unrecorded question is refused, not invented")
+    func unrecordedQuestionIsRefused() async {
+        let spy = RecordingProvider()
+        let coordinator = SolveCoordinator(provider: { spy })
+
+        coordinator.restore(nil, stepsJSON: nil, lessonJSON: nil,
+                            formulasJSON: nil, videosJSON: nil)
+        coordinator.ensureLoaded(.lesson)
+        await coordinator.settle()
+
+        #expect(spy.questions().isEmpty, "asked the model \(spy.questions())")
+        #expect(coordinator.lessonState.error == .questionNotRecorded)
+        #expect(coordinator.lessonState.error?.isRetryable == false)
+    }
+
     /// Requirement 1, stated directly: every surface of one solve gets the same
     /// bytes.
     @Test("every surface of one solve receives byte-identical input")
-    func allSurfacesAskTheSameThing() async {
-        let spy = Self.spy()
-        let coordinator = SolveCoordinator(provider: Self.factory(spy, recogniser: OCRCounter()))
+    func allSurfacesAskTheSameThing() async throws {
+        let spy = RecordingProvider()
+        let coordinator = SolveCoordinator(provider: { spy })
 
-        coordinator.solveFromImage(jpeg: Self.jpeg, placeholder: "Scanning...")
+        coordinator.begin(try await Self.builder(OCRCounter()).photograph(Self.jpeg))
         await coordinator.settle()
         for surface in [Surface.lesson, .formulas, .videos] {
             coordinator.ensureLoaded(surface)
@@ -77,6 +84,7 @@ struct SolveCoordinatorTests {
         }
 
         let asked = spy.questions()
+        #expect(asked.count == 4)
         #expect(Set(asked.values).count == 1,
                 "surfaces were asked different questions: \(asked)")
         #expect(asked[.steps] == Self.recognised)
@@ -84,15 +92,16 @@ struct SolveCoordinatorTests {
 
     /// A photograph is read once, not once per surface.
     ///
-    /// `SightedProvider` memoises per instance, and the app builds a new one per
-    /// request, so the memo has never hit: Vision runs for steps, for the title,
-    /// and again for every tab that is opened.
+    /// `SightedProvider` memoised per instance and the app built a new one per
+    /// request, so the memo never hit: Vision ran for steps, for the title, and
+    /// again for every tab that was opened. Reading it in `SolveBuilder` -- above
+    /// the provider rather than below it -- makes five reads unrepresentable.
     @Test("a photograph is read once per solve")
-    func photographIsReadOnce() async {
+    func photographIsReadOnce() async throws {
         let ocr = OCRCounter()
-        let coordinator = SolveCoordinator(provider: Self.factory(Self.spy(), recogniser: ocr))
+        let coordinator = SolveCoordinator(provider: { RecordingProvider() })
 
-        coordinator.solveFromImage(jpeg: Self.jpeg, placeholder: "Scanning...")
+        coordinator.begin(try await Self.builder(ocr).photograph(Self.jpeg))
         await coordinator.settle()
         for surface in [Surface.lesson, .formulas, .videos] {
             coordinator.ensureLoaded(surface)
@@ -105,16 +114,17 @@ struct SolveCoordinatorTests {
 
     // MARK: - Requirement 3: failure is legible
 
-    /// A retry cancels the tail of the chain, and the cancelled task returns
-    /// without writing a terminal state -- so the surface it was going to fetch
-    /// stays `loading` for the life of the screen, with no error and no way out.
+    /// A retry used to cancel the tail of the chain, and the cancelled task
+    /// returned without writing a terminal state -- so the surface it was going
+    /// to fetch stayed `loading` for the life of the screen, with no error and
+    /// no way out.
     @Test("retrying one surface does not strand another on a spinner")
-    func retryDoesNotStrandASpinner() async {
-        let spy = Self.spy()
+    func retryDoesNotStrandASpinner() async throws {
+        let spy = RecordingProvider()
         spy.fail(.steps, with: .contextExceeded)
         let coordinator = SolveCoordinator(provider: { spy })
 
-        coordinator.solveAll(problem: "Solve for x: x^2 - 5x + 6 = 0")
+        coordinator.begin(try Self.builder(OCRCounter()).typed("Solve for x: x^2 - 5x + 6 = 0"))
         await coordinator.settle()
         #expect(coordinator.stepsState.error != nil)
 
@@ -131,14 +141,41 @@ struct SolveCoordinatorTests {
     /// "Generate" button on an idle card must not send an empty problem.
     @Test("a surface cannot be fetched before anything has been solved")
     func noSolveMeansNoRequest() async {
-        let spy = Self.spy()
+        let spy = RecordingProvider()
         let coordinator = SolveCoordinator(provider: { spy })
 
         coordinator.retry(.steps)
         await coordinator.settle()
 
-        let asked = spy.questions()
-        #expect(asked.isEmpty, "asked the model \(asked)")
+        #expect(spy.questions().isEmpty, "asked the model \(spy.questions())")
+        #expect(coordinator.stepsState.error == .nothingToSolve)
+    }
+
+    /// A photograph with nothing legible in it fails once, before a results
+    /// screen exists, rather than four times inside it.
+    @Test("a photograph nothing can be read from fails before any request")
+    func unreadablePhotographFailsEarly() async {
+        let builder = SolveBuilder { _ in "   \n  " }
+        await #expect(throws: SolverError.self) {
+            _ = try await builder.photograph(Self.jpeg)
+        }
+    }
+
+    @Test("an empty typed problem is refused")
+    func emptyTypedProblemIsRefused() {
+        let builder = SolveBuilder { _ in "" }
+        #expect(throws: SolverError.nothingToSolve) {
+            _ = try builder.typed("   ")
+        }
+    }
+
+    /// Whitespace is trimmed once, in the constructor, so the string shown and
+    /// the string asked about are the same bytes.
+    @Test("the question shown is the question asked")
+    func questionIsTrimmedOnce() throws {
+        let solve = try SolveBuilder { _ in "" }.typed("  2x + 3 = 7  \n")
+        #expect(solve.question == "2x + 3 = 7")
+        #expect(solve.source == .typed)
     }
 }
 
@@ -158,7 +195,6 @@ private final class RecordingProvider: SolutionProvider, @unchecked Sendable {
     var identifier: String { "recording" }
     var maxConcurrentRequests: Int { 1 }
     var isConfigured: Bool { true }
-    var acceptsImageInput: Bool { false }
 
     private let lock = NSLock()
     private var seen: [Surface: String] = [:]
@@ -178,35 +214,32 @@ private final class RecordingProvider: SolutionProvider, @unchecked Sendable {
         return seen[surface]
     }
 
-    private func record(_ surface: Surface, _ input: ProblemInput) throws {
+    private func record(_ surface: Surface, _ question: String) throws {
         lock.lock()
-        seen[surface] = input.text ?? "<an unresolved photograph>"
+        seen[surface] = question
         let failure = failures[surface]
         lock.unlock()
         if let failure { throw failure }
     }
 
-    func steps(for problem: ProblemInput) async throws -> [StepItem] {
-        try record(.steps, problem)
+    func steps(for question: String) async throws -> [StepItem] {
+        try record(.steps, question)
         return [StepItem(step: 1, title: "t", explanation: "e", math: "x = 1")]
     }
-    func lesson(for problem: ProblemInput) async throws -> LessonContent {
-        try record(.lesson, problem)
+    func lesson(for question: String) async throws -> LessonContent {
+        try record(.lesson, question)
         return LessonContent(title: "t", topic: "a", introduction: "i",
                              sections: [], keyTakeaway: nil)
     }
-    func formulas(for problem: ProblemInput) async throws -> [FormulaItem] {
-        try record(.formulas, problem)
+    func formulas(for question: String) async throws -> [FormulaItem] {
+        try record(.formulas, question)
         return [FormulaItem(name: "n", formula: "x", description: "d")]
     }
-    func videos(for problem: ProblemInput) async throws -> [VideoItem] {
-        try record(.videos, problem)
+    func videos(for question: String) async throws -> [VideoItem] {
+        try record(.videos, question)
         return [VideoItem(title: "t", channel: "c", searchQuery: "q",
                           videoId: nil, thumbnailURL: nil)]
     }
-    func chatReply(to message: String, about problem: String,
+    func chatReply(to message: String, about question: String,
                    history: [ChatMessage]) async throws -> String { "reply" }
-    func title(for problem: ProblemInput) async -> String {
-        "A Model-Written Title"
-    }
 }

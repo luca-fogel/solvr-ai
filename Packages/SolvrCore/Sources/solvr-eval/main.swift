@@ -360,12 +360,12 @@ print("")
 var completed = 0
 for problem in problems {
   for run in 1...options.repeats {
-    let input = ProblemInput.text(problem.problem)
+    let question = problem.problem
 
     // Steps first: it is the surface the answer grading depends on.
     do {
         let clock = Date()
-        let steps = try await provider.steps(for: input)
+        let steps = try await provider.steps(for: question)
         let latency = Date().timeIntervalSince(clock)
         let (tex, answer) = latexAndAnswer(from: steps)
         let (compliance, input_, output_) = await telemetry.take("steps")
@@ -392,7 +392,7 @@ for problem in problems {
 
     do {
         let clock = Date()
-        let lesson = try await provider.lesson(for: input)
+        let lesson = try await provider.lesson(for: question)
         let latency = Date().timeIntervalSince(clock)
         let (compliance, input_, output_) = await telemetry.take("lesson")
         let (rawTex, droppedTex) = await traces.take("lesson")
@@ -419,7 +419,7 @@ for problem in problems {
 
     do {
         let clock = Date()
-        let formulas = try await provider.formulas(for: input)
+        let formulas = try await provider.formulas(for: question)
         let latency = Date().timeIntervalSince(clock)
         let (compliance, input_, output_) = await telemetry.take("formulas")
         let (rawTex, droppedTex) = await traces.take("formulas")

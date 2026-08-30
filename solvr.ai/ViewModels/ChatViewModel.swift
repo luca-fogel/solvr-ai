@@ -9,7 +9,11 @@ final class ChatViewModel {
     var isLoading: Bool = false
     var errorMessage: SolverError?
     
-    private var problemContext: String = ""
+    /// The problem the student is working on -- the *question*, never the label
+    /// shown above the tabs. `nil` for a saved entry whose question was never
+    /// recorded, where the honest answer is to say so rather than ask the tutor
+    /// about a title.
+    private var problemContext: String?
     
     let suggestedPrompts = [
         "Explain step 3 more",
@@ -18,8 +22,8 @@ final class ChatViewModel {
         "What if the numbers were different?"
     ]
     
-    func setProblemContext(_ problem: String) {
-        problemContext = problem
+    func setProblemContext(_ question: String?) {
+        problemContext = question
     }
     
     func sendMessage(_ text: String? = nil) async {
@@ -35,6 +39,14 @@ final class ChatViewModel {
             errorMessage = nil
         }
         
+        guard let problemContext else {
+            await MainActor.run {
+                errorMessage = .questionNotRecorded
+                isLoading = false
+            }
+            return
+        }
+
         do {
             let response = try await ProviderFactory.current().chatReply(
                 to: content,

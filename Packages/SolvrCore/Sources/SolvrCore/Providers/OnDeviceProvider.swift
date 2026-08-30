@@ -29,8 +29,9 @@ import FoundationModels
 ///   itself rather than trusting callers.
 /// - **It cannot see.** There is no image type anywhere in `FoundationModels`;
 ///   `PromptRepresentable` is `String`, `Prompt`, `Array` and `Optional`. Photos
-///   reach it as recognised text via `SightedProvider`, which is why
-///   `acceptsImageInput` is `false` here and why that is not a bug to fix.
+///   reach it as recognised text, read once by `SolveBuilder` before a `Solve`
+///   exists, so by the time anything here is called there is no image left to
+///   not-handle.
 @available(iOS 26.0, macOS 26.0, *)
 public final class OnDeviceProvider: SolutionProvider {
 
@@ -67,9 +68,6 @@ public final class OnDeviceProvider: SolutionProvider {
     public var identifier: String { "apple-on-device/guided" }
     public var maxConcurrentRequests: Int { 1 }
     public var isConfigured: Bool { availability == nil }
-
-    /// False, and not fixable: the framework takes no images at all.
-    public var acceptsImageInput: Bool { false }
 
     /// `nil` when the model is ready, otherwise the reason it is not.
     ///
@@ -225,8 +223,8 @@ public final class OnDeviceProvider: SolutionProvider {
 
     // MARK: - The four surfaces
 
-    public func steps(for problem: ProblemInput) async throws -> [StepItem] {
-        let text = try requireText(problem)
+    public func steps(for question: String) async throws -> [StepItem] {
+        let text = Self.plainForModel(question)
         let solution: GeneratedSolution = try await generate(
             surface: "steps",
             instructions: """
@@ -282,8 +280,8 @@ public final class OnDeviceProvider: SolutionProvider {
         return items
     }
 
-    public func lesson(for problem: ProblemInput) async throws -> LessonContent {
-        let text = try requireText(problem)
+    public func lesson(for question: String) async throws -> LessonContent {
+        let text = Self.plainForModel(question)
         let lesson: GeneratedLesson = try await generate(
             surface: "lesson",
             instructions: """
@@ -307,8 +305,8 @@ public final class OnDeviceProvider: SolutionProvider {
             keyTakeaway: lesson.keyTakeaway)
     }
 
-    public func formulas(for problem: ProblemInput) async throws -> [FormulaItem] {
-        let text = try requireText(problem)
+    public func formulas(for question: String) async throws -> [FormulaItem] {
+        let text = Self.plainForModel(question)
         let generated: GeneratedFormulas = try await generate(
             surface: "formulas",
             instructions: "You are a maths tutor listing the formulas a problem needs.",
@@ -327,8 +325,8 @@ public final class OnDeviceProvider: SolutionProvider {
     /// that 404s, so it is never asked for. `VideoItem.youtubeURL` already falls
     /// back to a search URL when `videoId` is nil, so the tab works and nothing
     /// is fabricated.
-    public func videos(for problem: ProblemInput) async throws -> [VideoItem] {
-        let text = try requireText(problem)
+    public func videos(for question: String) async throws -> [VideoItem] {
+        let text = Self.plainForModel(question)
         let generated: GeneratedVideos = try await generate(
             surface: "videos",
             instructions: """
@@ -344,7 +342,7 @@ public final class OnDeviceProvider: SolutionProvider {
     }
 
     public func chatReply(to message: String,
-                          about problem: String,
+                          about question: String,
                           history: [ChatMessage]) async throws -> String {
         if let unavailable = availability { throw unavailable }
 
@@ -359,7 +357,7 @@ public final class OnDeviceProvider: SolutionProvider {
             let session = LanguageModelSession(model: .default) {
                 """
                 You are a friendly, patient maths tutor. The student is working on: \
-                \(MathNotation.plainForModel(problem)). Answer their follow-up clearly \
+                \(Self.plainForModel(question)). Answer their follow-up clearly \
                 and encouragingly, in a short paragraph. If they seem confused, try an \
                 analogy.
                 """
@@ -367,23 +365,6 @@ public final class OnDeviceProvider: SolutionProvider {
             let prompt = recent.isEmpty ? message : "\(recent)\nStudent: \(message)"
             return try await session.respond(to: prompt, options: Self.options).content
         }
-    }
-
-    public func title(for problem: ProblemInput) async -> String {
-        guard case .text(let text) = problem else { return "Scanned Problem" }
-        let fallback = String(text.prefix(40))
-        guard availability == nil else { return fallback }
-
-        let generated = try? await run(surface: "title") {
-            let session = LanguageModelSession(model: .default) {
-                "You write three-to-five word titles for maths problems. Reply with the title only."
-            }
-            return try await session.respond(to: "Title this problem: \(text)",
-                                             options: Self.options).content
-        }
-        let title = (generated ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if title.isEmpty || title.count > 60 { return fallback }
-        return title
     }
 
     /// What a maths field turned into: something renderable, a sentence, or nothing.
@@ -444,19 +425,16 @@ public final class OnDeviceProvider: SolutionProvider {
         GenerationOptions(sampling: .greedy)
     }
 
-    private func requireText(_ problem: ProblemInput) throws -> String {
-        guard case .text(let text) = problem else {
-            // Reached only if this provider is used unwrapped. `ProviderFactory`
-            // wraps it in `SightedProvider`, which turns a photo into text first.
-            throw SolverError.backendUnavailable(
-                reason: "The on-device model cannot read images. "
-                      + "Text recognition should have run first.")
-        }
-        // Every prompt goes through this. `x³` made the model refuse outright
-        // and `·` made it generate past its own context window -- see
-        // `MathNotation.plainForModel`, where both are recorded with the runs
-        // that found them.
-        return MathNotation.plainForModel(text)
+    /// Every prompt goes through this. `x³` made the model refuse outright and
+    /// `·` made it generate past its own context window -- see
+    /// `MathNotation.plainForModel`, where both are recorded with the runs that
+    /// found them.
+    ///
+    /// It rewrites *notation*, never content: the question that reaches the
+    /// model is the question the user was shown, spelled the way this model can
+    /// read it. `x³` becomes `x^3`; nothing else moves.
+    static func plainForModel(_ question: String) -> String {
+        MathNotation.plainForModel(question)
     }
 
     /// One guided generation, with the schema kept out of the prompt.

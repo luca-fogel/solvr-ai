@@ -16,9 +16,17 @@ struct ContentView: View {
     @State private var path = NavigationPath()
     @State private var showHistory = false
     @State private var showSettings = false
-    @State private var currentProblem = ""
+    /// The solve on screen, or `nil` on the home screen.
+    ///
+    /// This replaces a `String` that held, at various moments, "Scanning...",
+    /// "[Scanned Image]", a model-written title, and occasionally the problem.
+    /// Every one of those was passed to the results screen as `problemText`, and
+    /// three of the four found their way into a prompt. A `Solve` cannot: it is
+    /// built once, by `SolveBuilder`, from something a person actually gave us.
+    @State private var currentSolve: Solve?
     @State private var isFromHistory = false
     @State private var currentHistoryProblem: Problem?
+    @State private var isReadingPhoto = false
 
     @State private var homeVM = HomeViewModel()
     @State private var resultsVM = ResultsViewModel()
@@ -50,13 +58,11 @@ struct ContentView: View {
                 .navigationBarHidden(true)
                 .navigationDestination(for: String.self) { _ in
                     ResultsView(
-                        problemText: currentProblem,
                         viewModel: resultsVM,
                         chatViewModel: chatVM,
                         onBack: {
-                            let titleToSave = resultsVM.problemTitle.isEmpty ? currentProblem : resultsVM.problemTitle
-                            if !titleToSave.isEmpty && titleToSave != "[Scanned Image]" && !isFromHistory {
-                                let problem = resultsVM.saveProblem(titleToSave, context: modelContext)
+                            if !isFromHistory,
+                               let problem = resultsVM.saveProblem(context: modelContext) {
                                 chatVM.saveMessages(to: problem)
                             } else if let historyProblem = currentHistoryProblem {
                                 chatVM.saveMessages(to: historyProblem)
@@ -150,30 +156,57 @@ struct ContentView: View {
 
     private func loadFromHistory(_ problem: Problem) {
         isFromHistory = true
-        currentProblem = problem.text
         currentHistoryProblem = problem
         chatVM.clear()
-        chatVM.setProblemContext(problem.text)
+        // The chat is told the question, not the label. It used to be told
+        // whatever the results header was showing -- so a photographed problem
+        // gave the tutor "The student is working on: Scanning...", on the first
+        // solve, with no history involved.
+        chatVM.setProblemContext(problem.question)
         chatVM.loadMessages(from: problem)
         resultsVM.loadFromHistory(problem)
+        currentSolve = resultsVM.solve
         path.append("results")
     }
 
     private func solve(_ problem: String) {
-        currentProblem = problem
-        isFromHistory = false
-        chatVM.clear()
-        chatVM.setProblemContext(problem)
-        resultsVM.solveAll(problem: problem)
-        path.append("results")
+        guard let solve = try? ProviderFactory.builder.typed(problem) else {
+            homeVM.errorMessage = SolverError.nothingToSolve.errorDescription
+            return
+        }
+        begin(solve)
     }
 
+    /// Read the photograph *before* leaving the camera.
+    ///
+    /// It used to navigate first and recognise later, inside the provider, once
+    /// per surface -- so a photograph with nothing legible in it produced four
+    /// identical errors on a results screen the student had already been pushed
+    /// to. Reading it here means "no text in that photo" is one sentence, on the
+    /// screen where the fix is to take another picture.
     private func solveFromImage(_ image: UIImage) {
-        currentProblem = "Scanning..."
+        guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
+            homeVM.errorMessage = SolverError.invalidResponse.errorDescription
+            return
+        }
+        isReadingPhoto = true
+        Task {
+            defer { isReadingPhoto = false }
+            do {
+                begin(try await ProviderFactory.builder.photograph(jpeg))
+            } catch {
+                homeVM.errorMessage = (error as? SolverError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+        }
+    }
+
+    private func begin(_ solve: Solve) {
+        currentSolve = solve
         isFromHistory = false
         chatVM.clear()
-        chatVM.setProblemContext("[Scanned Image]")
-        resultsVM.solveFromImage(image)
+        chatVM.setProblemContext(solve.question)
+        resultsVM.begin(solve)
         path.append("results")
     }
 }

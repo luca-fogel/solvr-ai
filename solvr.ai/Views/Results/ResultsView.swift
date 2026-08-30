@@ -1,7 +1,7 @@
 import SwiftUI
+import SolvrCore
 
 struct ResultsView: View {
-    let problemText: String
     @Bindable var viewModel: ResultsViewModel
     @Bindable var chatViewModel: ChatViewModel
     let onBack: () -> Void
@@ -23,7 +23,9 @@ struct ResultsView: View {
             }
         }
         .onAppear {
-            chatViewModel.setProblemContext(problemText)
+            // The question, not whatever is written above the tabs. This line
+            // used to hand the tutor "Scanning..." on every photographed solve.
+            chatViewModel.setProblemContext(viewModel.solve?.question)
         }
     }
 
@@ -34,15 +36,9 @@ struct ResultsView: View {
             topBar
                 .padding(.top, 4)
 
-            if let sourceImage = viewModel.sourceImage {
-                imageCard(sourceImage)
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.bottom, Theme.Spacing.md)
-            } else if problemText != "[Scanned Image]" {
-                problemCard
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.bottom, Theme.Spacing.md)
-            }
+            problemHeader
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.bottom, Theme.Spacing.md)
 
             DemoBanner()
 
@@ -76,22 +72,8 @@ struct ResultsView: View {
             HStack(spacing: 0) {
                 // LEFT: Problem image/text + chat
                 VStack(spacing: 0) {
-                    if let sourceImage = viewModel.sourceImage {
-                        Image(uiImage: sourceImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radii.lg, style: .continuous))
-                            .padding(Theme.Spacing.lg)
-                    } else if problemText != "[Scanned Image]" && problemText != "Scanning..." {
-                        Text(problemText)
-                            .font(Theme.Fonts.math(16))
-                            .foregroundStyle(Theme.Colors.textPrimary)
-                            .padding(Theme.Spacing.lg)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .cardStyle()
-                            .padding(Theme.Spacing.lg)
-                    }
+                    problemHeader
+                        .padding(Theme.Spacing.lg)
 
                     ChatView(viewModel: chatViewModel)
                 }
@@ -152,27 +134,42 @@ struct ResultsView: View {
         .padding(.horizontal, Theme.Spacing.md)
     }
 
-    // MARK: - Image Card
+    // MARK: - What is being solved
 
-    private func imageCard(_ image: UIImage) -> some View {
-        Image(uiImage: image)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .frame(maxHeight: 180)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radii.lg, style: .continuous))
-            .cardStyle()
-    }
+    /// The photograph, and under it the text that was actually read from it.
+    ///
+    /// The recognised line is the point of this view. Apple's on-device model
+    /// takes no image input, so a photographed problem is only ever as good as
+    /// what Vision made of it -- and until now the app never showed that, so a
+    /// misread `∫` looked identical to a model that could not integrate. What is
+    /// on screen here is the same string, byte for byte, that every tab was
+    /// asked about.
+    @ViewBuilder
+    private var problemHeader: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            if let image = viewModel.sourceImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radii.lg, style: .continuous))
+            }
 
-    // MARK: - Problem Text Card
-
-    private var problemCard: some View {
-        HStack {
-            Text(problemText)
-                .font(Theme.Fonts.math(14))
-                .foregroundStyle(Theme.Colors.textPrimary)
-                .lineLimit(3)
-            Spacer()
+            if let question = viewModel.solve?.question {
+                if viewModel.sourceImage != nil {
+                    Text("READ FROM THE PHOTO")
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .accessibilityLabel("Text read from the photo, and asked about")
+                }
+                Text(question)
+                    .font(Theme.Fonts.math(14))
+                    .foregroundStyle(Theme.Colors.textPrimary)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
         }
         .padding(Theme.Spacing.base)
         .cardStyle()
@@ -203,7 +200,7 @@ struct ResultsView: View {
     // MARK: - Share
 
     private var shareableText: String {
-        var parts: [String] = ["Problem: \(problemText)"]
+        var parts: [String] = ["Problem: \(viewModel.solve?.question ?? "(not recorded)")"]
         if viewModel.lesson != nil { parts.append("Lesson available") }
         parts.append("\nSolved with solvr.ai")
         return parts.joined(separator: "\n")

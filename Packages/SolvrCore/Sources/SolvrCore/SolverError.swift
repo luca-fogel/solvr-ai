@@ -39,6 +39,16 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
     /// Prompt plus completion did not fit the model's context window. Worth its
     /// own case because the fix is ours, not the user's.
     case contextExceeded
+    /// There is no question to ask. Reachable from the "Generate" button on a
+    /// surface that has never been given a problem, which used to send the model
+    /// an empty string and present whatever came back.
+    case nothingToSolve
+    /// A saved problem from before the app recorded what it read from the
+    /// photograph. The tabs that were saved with it are fine; the ones that were
+    /// not cannot be filled in, because the only thing left is a label and a
+    /// label is not a question. Asking the model about it anyway is exactly the
+    /// bug this case exists to refuse.
+    case questionNotRecorded
 
     public var errorDescription: String? {
         switch self {
@@ -63,6 +73,25 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
             // act on.
             return "The answer ran longer than the model could hold in memory. "
                  + "Try again, or ask for a smaller piece of the problem."
+        case .nothingToSolve:
+            return "There is no problem here to work on yet. Scan or type one first."
+        case .questionNotRecorded:
+            return "This one was saved before the app kept a record of what it "
+                 + "read from the photo, so there is nothing to ask about. "
+                 + "Scan it again to fill this tab in."
+        }
+    }
+
+    /// Whether offering "Try again" would be honest.
+    ///
+    /// Two of these cases cannot be retried into success: there is no question,
+    /// and no amount of asking again will produce one. A retry button that
+    /// cannot work is worse than none, because it implies the failure was
+    /// transient.
+    public var isRetryable: Bool {
+        switch self {
+        case .nothingToSolve, .questionNotRecorded: return false
+        default: return true
         }
     }
 
@@ -86,6 +115,8 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
         case .backendUnavailable: return "cpu"
         case .modelNotReady: return "hourglass"
         case .contextExceeded: return "text.append"
+        case .nothingToSolve: return "questionmark.square.dashed"
+        case .questionNotRecorded: return "text.viewfinder"
         default: return "exclamationmark.triangle.fill"
         }
     }
@@ -99,6 +130,8 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
         case .backendUnavailable: return "Model Unavailable"
         case .modelNotReady: return "Model Not Ready"
         case .contextExceeded: return "Ran Out of Room"
+        case .nothingToSolve: return "Nothing To Solve"
+        case .questionNotRecorded: return "Not Recorded"
         }
     }
 }

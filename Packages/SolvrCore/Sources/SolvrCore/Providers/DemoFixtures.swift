@@ -141,18 +141,5 @@ public enum DemoFixtures {
     The two copies of C cancel, whatever C was. So the bounds do not just give you a \
     number instead of a family of functions - they are the reason the ambiguity goes away.
     """
-
-    public static let detectedProblems = #"""
-    [
-      {
-        "bbox": { "top": 0.18, "left": 0.08, "width": 0.84, "height": 0.14 },
-        "latex": "\int_{0}^{1} 3x^{2}\,dx"
-      },
-      {
-        "bbox": { "top": 0.42, "left": 0.08, "width": 0.72, "height": 0.13 },
-        "latex": "\frac{d}{dx}\left(x^{3} - 4x\right)"
-      }
-    ]
-    """#
 }
 #endif  // SOLVR_DEMO

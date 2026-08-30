@@ -2,7 +2,7 @@ import Foundation
 import SolvrCore
 import UIKit
 
-/// Decides which provider answers, and gives it eyes.
+/// Decides which provider answers, and how a photograph becomes a question.
 ///
 /// This used to choose between three backends -- a hosted API, a model served on
 /// your own machine, and Apple's on-device model. The first two are gone: they
@@ -32,13 +32,32 @@ enum ProviderFactory {
             return FixtureSolutionProvider(latency: DemoMode.simulatedLatency)
         }
         #endif
-        return sighted(onDevice)
+        return onDevice
     }
 
     /// Cached, so `prewarm()` has somewhere to live. Loading the on-device model
     /// is the expensive part of the first solve, and a provider rebuilt per
     /// request could never warm it.
     static let onDevice = OnDeviceProvider()
+
+    /// Turns what the user did into a `Solve`.
+    ///
+    /// This is where a photograph stops being a photograph. It used to happen
+    /// underneath the provider, in a `SightedProvider` wrapper built fresh for
+    /// every request -- so its per-instance memo never hit, Vision ran once per
+    /// surface, and no layer above could see or record what had been read. Now
+    /// it happens once, before a `Solve` exists, which is what makes "every
+    /// surface of one solve was asked the same thing" true by construction.
+    ///
+    /// `OCRService` is injected rather than imported by `SolveBuilder` because
+    /// that keeps the resolution in `SolvrCore`, under test, without dragging
+    /// Vision in with it.
+    static let builder = SolveBuilder { data in
+        guard let image = UIImage(data: data) else {
+            throw SolverError.invalidResponse
+        }
+        return try await OCRService.recognizeText(from: image)
+    }
 
     /// Why the on-device model cannot answer right now, or `nil` if it can.
     ///
@@ -49,24 +68,5 @@ enum ProviderFactory {
     /// if they are told.
     static var onDeviceUnavailableReason: String? {
         onDevice.availability?.errorDescription
-    }
-
-    /// Wrap any provider that cannot look at a photograph so that it can.
-    ///
-    /// The wrapping is decided by the provider's own `acceptsImageInput` rather
-    /// than by a list kept here, so a backend added later cannot forget to
-    /// declare it and silently lose the camera. That is still worth keeping with
-    /// one backend: `FoundationModels` takes no image input at all, so this is
-    /// the only reason the scanner works. `OCRService` is injected rather than
-    /// imported by `SightedProvider` because that keeps the bridge in
-    /// `SolvrCore`, under test, without dragging Vision in with it.
-    private static func sighted(_ provider: any SolutionProvider) -> any SolutionProvider {
-        guard !provider.acceptsImageInput else { return provider }
-        return SightedProvider(wrapping: provider) { data in
-            guard let image = UIImage(data: data) else {
-                throw SolverError.invalidResponse
-            }
-            return try await OCRService.recognizeText(from: image)
-        }
     }
 }

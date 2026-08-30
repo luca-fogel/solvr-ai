@@ -42,10 +42,6 @@ public struct FixtureSolutionProvider: SolutionProvider {
     /// Always. Needing no configuration is the entire point.
     public var isConfigured: Bool { true }
 
-    /// It ignores the image and returns the same fixture, which is honest: the
-    /// demo is not pretending to read anything.
-    public var acceptsImageInput: Bool { true }
-
     private func pause() async {
         guard latency > .zero else { return }
         try? await Task.sleep(for: latency)
@@ -62,37 +58,32 @@ public struct FixtureSolutionProvider: SolutionProvider {
         return decoded.value
     }
 
-    public func lesson(for problem: ProblemInput) async throws -> LessonContent {
+    public func lesson(for question: String) async throws -> LessonContent {
         await pause()
         return try decode(LessonContent.self, from: DemoFixtures.lesson, label: "lesson")
     }
 
-    public func steps(for problem: ProblemInput) async throws -> [StepItem] {
+    public func steps(for question: String) async throws -> [StepItem] {
         await pause()
         return try decode([StepItem].self, from: DemoFixtures.steps, label: "steps")
     }
 
-    public func formulas(for problem: ProblemInput) async throws -> [FormulaItem] {
+    public func formulas(for question: String) async throws -> [FormulaItem] {
         await pause()
         return try decode([FormulaItem].self, from: DemoFixtures.formulas, label: "formulas")
     }
 
-    public func videos(for problem: ProblemInput) async throws -> [VideoItem] {
+    public func videos(for question: String) async throws -> [VideoItem] {
         await pause()
         return try decode([VideoItem].self, from: DemoFixtures.videos, label: "videos")
     }
 
     public func chatReply(to message: String,
-                          about problem: String,
+                          about question: String,
                           history: [ChatMessage]) async throws -> String {
         await pause()
         return DemoFixtures.chatReply
     }
 
-    /// No pause: the title is fetched alongside the four surfaces and delaying it
-    /// only delays the header.
-    public func title(for problem: ProblemInput) async -> String {
-        DemoFixtures.title
-    }
 }
 #endif  // SOLVR_DEMO

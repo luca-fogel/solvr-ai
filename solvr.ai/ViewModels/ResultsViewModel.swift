@@ -23,10 +23,9 @@ final class ResultsViewModel {
     /// surface any provider is asked for.
     var selectedTab: ResultTab = .steps
 
-    /// Source image from the camera scanner.
-    var sourceImage: UIImage?
-
     // MARK: - Content, forwarded
+
+    var solve: Solve? { coordinator.solve }
 
     var stepsState: SurfaceState<[StepItem]> { coordinator.stepsState }
     var lessonState: SurfaceState<LessonContent> { coordinator.lessonState }
@@ -38,26 +37,19 @@ final class ResultsViewModel {
     var formulas: [FormulaItem]? { coordinator.formulas }
     var videos: [VideoItem]? { coordinator.videos }
 
-    var currentProblem: String { coordinator.currentProblem }
-    var problemTitle: String { coordinator.problemTitle }
     var isLoadingAny: Bool { coordinator.isLoadingAny }
+
+    /// The photograph this solve came from, decoded for display. Held here
+    /// rather than in the package because `UIImage` is UIKit, and the package
+    /// stays runnable by `swift test`.
+    private(set) var sourceImage: UIImage?
 
     // MARK: - Solve
 
-    func solveAll(problem: String) {
-        sourceImage = nil
+    func begin(_ solve: Solve) {
         selectedTab = .steps
-        coordinator.solveAll(problem: problem)
-    }
-
-    func solveFromImage(_ image: UIImage) {
-        sourceImage = image
-        selectedTab = .steps
-        guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
-            coordinator.failEverything(with: .invalidResponse)
-            return
-        }
-        coordinator.solveFromImage(jpeg: jpeg, placeholder: "[Scanned Image]")
+        sourceImage = solve.photograph.flatMap(UIImage.init(data:))
+        coordinator.begin(solve)
     }
 
     func ensureLoaded(_ tab: ResultTab) {
@@ -69,12 +61,22 @@ final class ResultsViewModel {
 
     func loadFromHistory(_ problem: Problem) {
         selectedTab = .steps
-        sourceImage = problem.sourceImageData.flatMap(UIImage.init(data:))
-        coordinator.loadFromHistory(text: problem.text,
-                                    stepsJSON: problem.stepsJSON,
-                                    lessonJSON: problem.lessonJSON,
-                                    formulasJSON: problem.formulasJSON,
-                                    videosJSON: problem.videosJSON)
+        let jpeg = problem.sourceImageData
+        sourceImage = jpeg.flatMap(UIImage.init(data:))
+
+        // A saved entry can only be re-asked if the question was recorded with
+        // it. Where it was not -- everything saved before `Problem.question`
+        // existed -- the coordinator is given nothing, and refuses to generate
+        // the tabs that were not saved rather than asking about the label.
+        let solve = problem.question.map {
+            Solve(question: $0,
+                  source: jpeg.map { data in .photograph(jpeg: data) } ?? .typed)
+        }
+        coordinator.restore(solve,
+                            stepsJSON: problem.stepsJSON,
+                            lessonJSON: problem.lessonJSON,
+                            formulasJSON: problem.formulasJSON,
+                            videosJSON: problem.videosJSON)
     }
 
     // MARK: - Retry
@@ -86,16 +88,20 @@ final class ResultsViewModel {
 
     // MARK: - Save to history
 
+    /// Saves the question alongside the label, so this entry can be re-opened
+    /// and its unfetched tabs generated from the problem rather than from
+    /// whatever was on screen.
     @discardableResult
-    func saveProblem(_ problemText: String, context: ModelContext) -> Problem {
-        let displayText = problemTitle.isEmpty ? problemText : problemTitle
+    func saveProblem(context: ModelContext) -> Problem? {
+        guard let solve else { return nil }
         let problem = Problem(
-            text: displayText,
+            text: solve.shortLabel,
+            question: solve.question,
             formulasJSON: formulas.flatMap { try? String(data: JSONEncoder().encode($0), encoding: .utf8) },
             stepsJSON: steps.flatMap { try? String(data: JSONEncoder().encode($0), encoding: .utf8) },
             videosJSON: videos.flatMap { try? String(data: JSONEncoder().encode($0), encoding: .utf8) },
             lessonJSON: lesson.flatMap { try? String(data: JSONEncoder().encode($0), encoding: .utf8) },
-            sourceImageData: sourceImage?.jpegData(compressionQuality: 0.7)
+            sourceImageData: solve.photograph
         )
         context.insert(problem)
         return problem

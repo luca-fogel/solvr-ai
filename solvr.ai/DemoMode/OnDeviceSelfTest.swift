@@ -84,10 +84,9 @@ enum OnDeviceSelfTest {
         // numbers are published -- but a Mac with 64 GB is not an iPhone, and the
         // first run of this on hardware disagreed with it.
         for sample in problems() {
-            let input = ProblemInput.text(sample.text)
             let clock = Date()
             do {
-                let steps = try await provider.steps(for: input)
+                let steps = try await provider.steps(for: sample.text)
                 let answer = steps.last(where: { $0.isFinalAnswer }) ?? steps.last
                 log(String(format: "%@: %d steps in %.1fs", sample.id, steps.count,
                            Date().timeIntervalSince(clock)))
@@ -99,7 +98,7 @@ enum OnDeviceSelfTest {
             }
         }
 
-        let problem = ProblemInput.text("Evaluate the definite integral of 3x^2 from 0 to 1")
+        let problem = "Evaluate the definite integral of 3x^2 from 0 to 1"
 
         do {
             let clock = Date()
