@@ -9,8 +9,14 @@ enum HTMLBuilder {
         var body = ""
         for (i, step) in steps.enumerated() {
             let isLast = i == steps.count - 1
-            let accentColor = isLast ? "var(--success)" : "var(--accent)"
-            let label = isLast ? "Final Answer" : step.title
+            // "Final answer" is what the provider says it is, not what position
+            // a step happens to occupy. The old version relabelled the last step
+            // unconditionally -- throwing away the model's own heading, and
+            // announcing a conclusion even when generation had been cut off
+            // mid-working, which is exactly when the claim is worst.
+            let isAnswer = step.isFinalAnswer
+            let accentColor = isAnswer ? "var(--success)" : "var(--accent)"
+            let badge = isAnswer ? "<span class=\"final-badge\">Final answer</span>" : ""
 
             body += """
             <div class="step-row">
@@ -19,7 +25,7 @@ enum HTMLBuilder {
                     \(isLast ? "" : "<div class=\"line\"></div>")
                 </div>
                 <div class="step-content">
-                    <div class="step-title">\(escapeHTML(label))</div>
+                    <div class="step-title">\(escapeHTML(step.title))\(badge)</div>
                     <div class="step-explanation">\(escapeHTML(step.explanation))</div>
             """
 
@@ -44,6 +50,9 @@ enum HTMLBuilder {
         .line { width:1px; flex:1; background:var(--separator); min-height:16px; }
         .step-content { flex:1; padding-bottom:20px; }
         .step-title { font-weight:600; font-size:16px; color:var(--text-primary); margin-bottom:4px; }
+        .final-badge { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:99px;
+                       background:var(--success); color:#fff; font-size:11px; font-weight:700;
+                       letter-spacing:0.03em; vertical-align:middle; }
         .step-explanation { font-size:15px; color:var(--text-secondary); line-height:1.5; margin-bottom:8px; }
         .math-block { background:var(--tertiary-bg); border-radius:12px; padding:14px 16px;
                       overflow:hidden !important; margin-top:4px; max-width:100%; }
@@ -290,39 +299,16 @@ enum HTMLBuilder {
         LLMJSON.escapeHTML(text)
     }
 
-    /// Preserves LaTeX backslashes for KaTeX while the surrounding text is HTML-escaped.
+    /// Preserves LaTeX backslashes while neutralising the three characters an
+    /// HTML parser would act on. Implemented in `SolvrCore.MathHTML` so it is
+    /// covered by `swift test`; see there for what went wrong without it.
     private static func escapeLaTeX(_ latex: String) -> String {
-        // Strip dollar-sign delimiters — we wrap in \[ \] ourselves
-        var result = latex
-        result = result.replacingOccurrences(of: "$$", with: "")
-        result = result.replacingOccurrences(of: "$", with: "")
-        return result
+        MathHTML.escapeLaTeX(latex)
     }
 
-    /// Converts `$...$` inline delimiters in HTML-escaped text to `\(...\)` for KaTeX auto-render.
+    /// Converts `$...$` inline delimiters in HTML-escaped text to `\(...\)` for
+    /// KaTeX auto-render. In `SolvrCore.MathHTML`, and tested there.
     private static func processInlineMath(_ htmlText: String) -> String {
-        // The text is already HTML-escaped, so $ signs are literal.
-        // Convert $...$ to \(...\) for KaTeX auto-render.
-        var result = ""
-        var inMath = false
-        var i = htmlText.startIndex
-
-        while i < htmlText.endIndex {
-            if htmlText[i] == "$" {
-                if inMath {
-                    result += "\\)"
-                    inMath = false
-                } else {
-                    result += "\\("
-                    inMath = true
-                }
-                i = htmlText.index(after: i)
-            } else {
-                result.append(htmlText[i])
-                i = htmlText.index(after: i)
-            }
-        }
-
-        return result
+        MathHTML.processInlineMath(htmlText)
     }
 }

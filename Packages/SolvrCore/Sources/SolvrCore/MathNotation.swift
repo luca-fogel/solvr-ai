@@ -26,7 +26,7 @@ public enum MathNotation {
     public static func toLaTeX(_ raw: String) -> String {
         guard needsConversion(raw) else { return raw }
 
-        var s = raw
+        var s = radicals(raw)
         for (plain, latex) in symbols {
             s = s.replacingOccurrences(of: plain, with: latex)
         }
@@ -83,7 +83,7 @@ public enum MathNotation {
 
     /// Unicode a model reaches for instead of the command.
     private static let symbols: [(String, String)] = [
-        ("∫", "\\int"), ("∑", "\\sum"), ("∏", "\\prod"), ("√", "\\sqrt"),
+        ("∫", "\\int"), ("∑", "\\sum"), ("∏", "\\prod"),
         ("∂", "\\partial"), ("∇", "\\nabla"), ("∞", "\\infty"),
         ("≠", "\\neq"), ("≤", "\\leq"), ("≥", "\\geq"), ("≈", "\\approx"),
         ("±", "\\pm"), ("×", "\\times"), ("÷", "\\div"), ("⋅", "\\cdot"),
@@ -93,6 +93,53 @@ public enum MathNotation {
         ("φ", "\\phi"), ("ω", "\\omega"), ("Δ", "\\Delta"), ("Σ", "\\Sigma"),
         ("Ω", "\\Omega"),
     ]
+
+    /// `√16` -> `\sqrt{16}`, `√(x+1)` -> `\sqrt{x+1}`.
+    ///
+    /// This one is not cosmetic. `√` used to be a plain entry in the symbol
+    /// table, mapping to `\sqrt` with no argument -- so `√16` became `\sqrt16`,
+    /// which KaTeX reads as `\sqrt{1}` followed by a `6` and renders as √1·6.
+    /// A different number, shown to a student with no hint that anything was
+    /// substituted. `√x` fared worse: `\sqrtx` is not a command at all.
+    ///
+    /// The radical therefore takes its argument the way LaTeX needs it: the
+    /// parenthesised group if there is one, otherwise the run of alphanumerics,
+    /// otherwise nothing at all -- a bare `\sqrt` with the input unchanged after
+    /// it, which is no worse than what was there.
+    private static func radicals(_ s: String) -> String {
+        guard s.contains("√") else { return s }
+        var out = ""
+        var index = s.startIndex
+        while index < s.endIndex {
+            guard s[index] == "√" else {
+                out.append(s[index])
+                index = s.index(after: index)
+                continue
+            }
+            var argument = s.index(after: index)
+            while argument < s.endIndex, s[argument] == " " {
+                argument = s.index(after: argument)
+            }
+            if argument < s.endIndex, s[argument] == "(",
+               let close = matchingParen(s, from: argument) {
+                out += "\\sqrt{\(String(s[s.index(after: argument)..<close]))}"
+                index = s.index(after: close)
+                continue
+            }
+            var end = argument
+            while end < s.endIndex, s[end].isLetter || s[end].isNumber || s[end] == "." {
+                end = s.index(after: end)
+            }
+            if end > argument {
+                out += "\\sqrt{\(String(s[argument..<end]))}"
+                index = end
+            } else {
+                out += "\\sqrt"
+                index = s.index(after: index)
+            }
+        }
+        return out
+    }
 
     /// `\int[0,1]` -> `\int_{0}^{1}`.
     ///
@@ -132,7 +179,18 @@ public enum MathNotation {
                     let prev = out[out.index(before: range.lowerBound)]
                     beforeOK = !prev.isLetter && prev != "\\"
                 }
-                guard beforeOK else {
+                // And not the start of a longer word either: checking only the
+                // character before turned `sine` into `\sine`, `cost` into
+                // `\cost` and `expression` into `\expression` -- undefined
+                // control sequences that KaTeX drops or paints red. A digit may
+                // follow (`sin2x`), a letter may not.
+                let afterOK: Bool
+                if range.upperBound == out.endIndex {
+                    afterOK = true
+                } else {
+                    afterOK = !out[range.upperBound].isLetter
+                }
+                guard beforeOK, afterOK else {
                     searchFrom = range.upperBound
                     continue
                 }
@@ -218,4 +276,68 @@ public enum MathNotation {
         }
         return nil
     }
+}
+
+// MARK: - Input, going the other way
+
+extension MathNotation {
+
+    /// Rewrite a problem into notation the on-device model will accept.
+    ///
+    /// Measured, and the measurement was a surprise. Two of the app's six
+    /// example problems failed on **every** run, deterministically, and neither
+    /// failure was about the mathematics:
+    ///
+    /// - `Find the derivative of f(x) = x³ · sin(x)` came back as a *refusal* --
+    ///   `GenerationError.guardrailViolation`, surfaced to the student as "the
+    ///   model declined this one". Replacing `x³` with `x^3` answers it
+    ///   correctly. `x²` in the algebra example was fine, so this is not a rule
+    ///   about superscripts the model states anywhere; it is behaviour, and the
+    ///   only way to know was to run it.
+    /// - The middle dot `·` sent it into a generation long enough to exceed the
+    ///   4,096-token window: `contextExceeded`, no answer at all. `*` is fine.
+    ///
+    /// So the app writes the problem the way the model can read it before
+    /// asking. This is not cosmetic and it is not only about the chips: a
+    /// student typing `x³` on the iOS keyboard, or a photograph of a textbook
+    /// read by Vision, produces exactly these characters.
+    ///
+    /// Conservative on purpose. It converts the characters that were measured
+    /// to break generation and leaves the rest -- `θ`, `π`, `≤` all appear in a
+    /// sample problem the model answers correctly, so they stay.
+    public static func plainForModel(_ raw: String) -> String {
+        var out = ""
+        var pendingSuperscript = ""
+
+        func flushSuperscript() {
+            guard !pendingSuperscript.isEmpty else { return }
+            // Braces only when there is more than one digit: `x^2` is what the
+            // model writes itself, and matching its own idiom is the point.
+            out += pendingSuperscript.count == 1
+                ? "^\(pendingSuperscript)"
+                : "^{\(pendingSuperscript)}"
+            pendingSuperscript = ""
+        }
+
+        for character in raw {
+            if let digit = superscriptDigits[character] {
+                pendingSuperscript.append(digit)
+                continue
+            }
+            flushSuperscript()
+            switch character {
+            case "·", "⋅", "×": out.append("*")
+            case "÷": out.append("/")
+            case "−": out.append("-")   // U+2212, not a hyphen
+            default: out.append(character)
+            }
+        }
+        flushSuperscript()
+        return out
+    }
+
+    private static let superscriptDigits: [Character: Character] = [
+        "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
+        "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+    ]
 }

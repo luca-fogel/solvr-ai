@@ -114,3 +114,60 @@ struct ProseDetection {
         #expect(!MathNotation.looksLikeProse("sin(x) cos(x) = \\frac{1}{2}\\sin(2x)"))
     }
 }
+
+/// Regressions from the first run of the app on a real iPhone, where the six
+/// topic-chip problems produced maths that was wrong, garbled or missing.
+@Suite("Conversions that used to corrupt correct maths")
+struct MathNotationRegressionTests {
+
+    @Test("a function name inside a longer word is left alone")
+    func functionNamesAreNotWordPrefixes() {
+        // Every one of these became an undefined control sequence -- \sine,
+        // \cost, \expression -- which KaTeX drops or paints red. This is a large
+        // part of what "the rendering is garbled" meant.
+        for word in ["sine", "cosine", "cost", "tangent", "expression",
+                     "exponent", "logistic", "secant", "cotangent"] {
+            #expect(MathNotation.toLaTeX(word) == word, "\(word) was rewritten")
+        }
+    }
+
+    @Test("a real function call still becomes a command")
+    func functionCallsStillConvert() {
+        #expect(MathNotation.toLaTeX("sin(x)") == #"\sin(x)"#)
+        #expect(MathNotation.toLaTeX("2sin(θ) - 1 = 0") == #"2\sin(\theta) - 1 = 0"#)
+        #expect(MathNotation.toLaTeX("log(100)") == #"\log(100)"#)
+    }
+
+    @Test("the radical takes its argument -- √16 was rendering as √1 times 6")
+    func radicalTakesItsArgument() {
+        #expect(MathNotation.toLaTeX("√16") == #"\sqrt{16}"#)
+        #expect(MathNotation.toLaTeX("√(x+1)") == #"\sqrt{x+1}"#)
+        #expect(MathNotation.toLaTeX("√x + √y") == #"\sqrt{x} + \sqrt{y}"#)
+        #expect(MathNotation.toLaTeX("√2.5") == #"\sqrt{2.5}"#)
+    }
+
+    @Test("a radical with nothing after it is left as a bare command, not a corruption")
+    func radicalWithNoArgument() {
+        #expect(MathNotation.toLaTeX("√") == #"\sqrt"#)
+    }
+
+    @Test("converting twice changes nothing, radicals included")
+    func radicalsAreIdempotent() {
+        for input in ["√16", "√(x+1)", "√x + √y", "sin(x) + √2"] {
+            let once = MathNotation.toLaTeX(input)
+            #expect(MathNotation.toLaTeX(once) == once, "\(input) was not stable")
+        }
+    }
+
+    @Test("the six problems the topic chips insert are all convertible")
+    func sampleProblemsSurviveConversion() {
+        // Not an assertion about the model: an assertion that the strings the
+        // app inserts do not themselves trip the converter.
+        for sample in SampleProblems.all {
+            let converted = MathNotation.toLaTeX(sample.text)
+            #expect(!converted.contains(#"\sine"#))
+            #expect(!converted.contains(#"\sqrt1"#))
+            #expect(!converted.isEmpty)
+        }
+    }
+}
