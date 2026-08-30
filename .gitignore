@@ -40,6 +40,10 @@ Local.xcconfig
 # Evaluation runs (raw results are large and machine-specific)
 eval-*.jsonl
 *.graded.jsonl
+# ...except the published ones. A number in a document here is generated from
+# the records beside it and check.sh diffs the two, so the records have to be in
+# the repository or the check passes locally and fails everywhere else.
+!docs/eval-records/**/*.graded.jsonl
 
 # Fine-tune build products (adapters and fused models are regenerated, not shared)
 tools/finetune/adapters/
