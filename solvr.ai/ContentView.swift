@@ -26,7 +26,6 @@ struct ContentView: View {
     @State private var currentSolve: Solve?
     @State private var isFromHistory = false
     @State private var currentHistoryProblem: Problem?
-    @State private var isReadingPhoto = false
 
     @State private var homeVM = HomeViewModel()
     @State private var resultsVM = ResultsViewModel()
@@ -197,9 +196,7 @@ struct ContentView: View {
             homeVM.errorMessage = SolverError.invalidResponse.errorDescription
             return
         }
-        isReadingPhoto = true
         Task {
-            defer { isReadingPhoto = false }
             do {
                 begin(try await ProviderFactory.builder.photograph(jpeg))
             } catch {
