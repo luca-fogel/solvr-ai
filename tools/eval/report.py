@@ -57,7 +57,9 @@ def main():
 
     print("## Schema compliance, per surface\n")
     print("Fraction of responses that decoded with nothing done to them -- no fence")
-    print("removed, no prose trimmed, no LaTeX escape repaired, no renormalisation.\n")
+    print("removed, no prose trimmed, no LaTeX escape repaired, no renormalisation.")
+    print("`n/a` is a backend that never produces a string to repair: guided")
+    print("generation returns a typed value, so the ladder is unreachable.\n")
     surfaces = ["steps", "lesson", "formulas"]
     print("| backend | " + " | ".join(surfaces) + " |")
     print("|---|" + "---|" * len(surfaces))
@@ -65,8 +67,16 @@ def main():
         cells = []
         for surface in surfaces:
             rows = [r for r in by_backend_surface[(backend, surface)] if r["ok"]]
-            clean = sum(1 for r in rows if r.get("isClean"))
-            cells.append(f"{pct(clean, len(rows))} ({clean}/{len(rows)})")
+            measured = [r for r in rows if r.get("isClean") is not None]
+            if rows and not measured:
+                # Guided generation hands back a typed value: there is no string
+                # to repair and so no compliance ladder to report. Absent is the
+                # honest answer; printing 0% would read as "nothing decoded
+                # cleanly", which is the opposite of what happened.
+                cells.append("n/a")
+                continue
+            clean = sum(1 for r in measured if r.get("isClean"))
+            cells.append(f"{pct(clean, len(measured))} ({clean}/{len(measured)})")
         print(f"| `{backend}` | " + " | ".join(cells) + " |")
 
     print("\n## What had to be done, when it was not clean\n")

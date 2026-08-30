@@ -6,12 +6,14 @@
 
 Fraction of responses that decoded with nothing done to them -- no fence
 removed, no prose trimmed, no LaTeX escape repaired, no renormalisation.
+`n/a` is a backend that never produces a string to repair: guided
+generation returns a typed value, so the ladder is unreachable.
 
 | backend | steps | lesson | formulas |
 |---|---|---|---|
-| `local/qwen3-4b+lora@525` | 88% (38/43) | 98% (42/43) | 50% (21/42) |
-| `local/qwen3-4b+lora@600` | 93% (39/42) | 95% (41/43) | 56% (24/43) |
-| `local/qwen3-4b-base` | 86% (36/42) | 88% (38/43) | 60% (26/43) |
+| `local/qwen3-4b+lora@525` | 93% (38/41) | 98% (42/43) | 50% (21/42) |
+| `local/qwen3-4b+lora@600` | 95% (39/41) | 98% (41/42) | 56% (24/43) |
+| `local/qwen3-4b-base` | 88% (36/41) | 90% (38/42) | 60% (26/43) |
 
 ## What had to be done, when it was not clean
 

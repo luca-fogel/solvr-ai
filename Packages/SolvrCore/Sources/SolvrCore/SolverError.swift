@@ -56,7 +56,13 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
         case .modelNotReady:
             return "The model is still getting ready. Please try again in a moment."
         case .contextExceeded:
-            return "This problem was too long for the on-device model. Try a shorter problem."
+            // Measured: this fires on six-word problems. The model's 4,096-token
+            // window covers the prompt *and* the answer, so it is usually the
+            // answer that ran long, not the question -- and telling a student to
+            // shorten a question that was already short is advice they cannot
+            // act on.
+            return "The answer ran longer than the model could hold in memory. "
+                 + "Try again, or ask for a smaller piece of the problem."
         }
     }
 
@@ -92,7 +98,7 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
         case .decodingFailed: return "Parsing Error"
         case .backendUnavailable: return "Model Unavailable"
         case .modelNotReady: return "Model Not Ready"
-        case .contextExceeded: return "Problem Too Long"
+        case .contextExceeded: return "Ran Out of Room"
         }
     }
 }

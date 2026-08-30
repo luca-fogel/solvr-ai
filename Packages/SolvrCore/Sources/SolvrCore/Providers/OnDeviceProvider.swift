@@ -149,10 +149,14 @@ public final class OnDeviceProvider: SolutionProvider {
     struct GeneratedLesson {
         @Guide(description: "Two words: a broad area and a sub-area, like 'Calculus - Integration'.")
         var topic: String
-        @Guide(description: "One or two sentences on when and why this concept matters.")
+        @Guide(description: "One sentence on when and why this concept matters.")
         var introduction: String
-        @Guide(description: "Sections teaching the concept: what it is, an intuition, then a worked example.",
-               .count(2...3))
+        // Two, not "two to three". The lesson is the surface that overruns:
+        // asked for up to three sections it wrote past the 4,096-token window
+        // on two of the six sample problems, every run, and a
+        // `contextExceeded` is not a shorter lesson -- it is no lesson at all.
+        @Guide(description: "Two sections: what the concept is, then a worked example.",
+               .count(2...2))
         var sections: [GeneratedSection]
         @Guide(description: "One sentence summarising the key idea.")
         var keyTakeaway: String
@@ -172,7 +176,7 @@ public final class OnDeviceProvider: SolutionProvider {
     struct GeneratedSection {
         @Guide(description: "A short section heading.")
         var heading: String
-        @Guide(description: "Two to four sentences of explanation. Inline maths goes in $...$.")
+        @Guide(description: "One or two sentences of explanation. Inline maths goes in $...$.")
         var content: String
         @Guide(description: """
             The key formula in LaTeX with no dollar delimiters, using commands \
@@ -283,8 +287,9 @@ public final class OnDeviceProvider: SolutionProvider {
         let lesson: GeneratedLesson = try await generate(
             surface: "lesson",
             instructions: """
-            You are a maths tutor. Teach the concept behind the student's problem. \
-            Do not solve their exact problem.
+            You are a maths tutor. Teach the concept behind the student's problem \
+            briefly. Do not solve their exact problem. Keep the whole lesson under \
+            two hundred words.
             """,
             prompt: "Teach the concept behind this problem: \(text)")
 

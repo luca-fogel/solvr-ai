@@ -174,6 +174,36 @@ they need Xcode 26 and the iOS 26 SDK, and a workflow pinned to an image that
 may not have them yet would produce a red badge that says nothing about the
 code. Those two are a local check.
 
+## What the on-device model actually does
+
+Until this release the shipped backend had never been measured. Everything in
+[docs/evaluation-local.md](docs/evaluation-local.md) is a local Qwen3-4B, which
+is not the model on your phone.
+
+Six problems -- the ones the topic chips insert -- three runs each, graded by
+[the same harness](docs/evaluation-samples.md) that measured the fine-tune:
+
+| | requests that returned | answer correct | LaTeX that renders |
+|---|---|---|---|
+| before | 45/54 | 12/18 | 76% (84/111) |
+| after | **54/54** | **18/18** | **100% (132/132)** |
+
+Three surfaces per problem — steps, lesson, formulas — so 54 requests. Median
+4.1 s each, one at a time.
+
+The nine failures on the left are not the model getting the maths wrong. Three
+were a refusal — `x³ · sin(x)` trips a guardrail, `x^3 * sin(x)` does not — and
+six were the model generating past its own 4,096-token window: on a six-number
+data set, and on a lesson it was allowed three sections to write. The render
+failures were mostly two bugs of ours: `√[...]` losing its argument to LaTeX's
+optional-index syntax, and a literal `\n` read as an undefined control sequence.
+
+What is **not** claimed: that this generalises. Six problems chosen to be the
+app's shop window are the easiest six problems in it, and greedy decoding makes
+three runs agree with each other by construction. The number to take seriously
+is the one on the left: a third of the examples the app shipped with did not
+work at all, and nothing measured them.
+
 ## What it does not do
 
 - **Answering on a real device is confirmed; a full offline run is not yet
@@ -192,7 +222,7 @@ code. Those two are a local check.
 - **The fine-tune is not shipped, because it lost.** See below.
 - **No answer verification.** The app does not check the model's arithmetic. It
   is a tutor's explanation, not a proof assistant, and a wrong step will be
-  presented as confidently as a right one.
+  presented as confidently as a right one. The Steps tab says so on screen.
 - **No accounts, no sync, no telemetry, and now no uploads at all.** History is
   local to the device via SwiftData, and with the hosted backend gone there is
   nothing left that sends the problem anywhere. The only outbound link in the app

@@ -50,6 +50,16 @@ else
   fail=1
 fi
 
+# The same rule for the on-device arms, which live in a subdirectory so the
+# corpus totals asserted below stay what they were.
+note "docs/evaluation-samples.md regenerates from docs/eval-records/samples/"
+if python3 tools/eval/report.py docs/eval-records/samples/*.graded.jsonl \
+   | diff - docs/evaluation-samples.md; then
+  echo "identical"
+else
+  fail=1
+fi
+
 note "Every record is parseable and accounted for"
 python3 - <<'PY' || fail=1
 import glob, json
