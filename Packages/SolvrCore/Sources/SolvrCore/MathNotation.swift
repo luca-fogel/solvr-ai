@@ -34,9 +34,7 @@ public enum MathNotation {
         guard needsConversion(evidence) else { return cleaned }
 
         var s = radicals(cleaned)
-        for (plain, latex) in symbols {
-            s = s.replacingOccurrences(of: plain, with: latex)
-        }
+        s = substituteSymbols(s)
         s = bracketedLimits(s)
         s = functionCalls(s)
         s = braceExponents(s, marker: "^")
@@ -87,6 +85,51 @@ public enum MathNotation {
         }
         return true
     }
+
+    /// Replace Unicode operators with the commands, terminating each one.
+    ///
+    /// This was thirty `replacingOccurrences` calls, and every one of them was
+    /// wrong in the same way. A LaTeX control word runs to the first non-letter,
+    /// so substituting `∫` for `\int` in `∫x^n dx` produces `\intx^n dx`, which
+    /// is the single undefined command `\intx` -- red text on a phone, which is
+    /// exactly what a student photographing an integral got. `πr²` became
+    /// `\pir^{2}`, `2πn` became `2\pin`, `Σx_i` became `\Sigmax_{i}`.
+    ///
+    /// The worst of them rendered. `∈f(x)` became `\inf(x)`, and `\inf` is a
+    /// real command -- the infimum -- so "x is an element of f(x)" was quietly
+    /// displayed as "inf(x)" with nothing red to notice.
+    ///
+    /// One scan, and a space after the command when a letter follows it. A
+    /// bracket is not a letter, so `∫[0,1]` still reaches `bracketedLimits` as
+    /// `\int[0,1]`, and a symbol already followed by a space gains nothing.
+    private static func substituteSymbols(_ s: String) -> String {
+        var out = ""
+        var index = s.startIndex
+        while index < s.endIndex {
+            let character = s[index]
+            let next = s.index(after: index)
+            guard let command = symbolCommands[character] else {
+                out.append(character)
+                index = next
+                continue
+            }
+            out += command
+            if next < s.endIndex, s[next].isLetter { out.append(" ") }
+            index = next
+        }
+        return out
+    }
+
+    /// The table keyed for the scan. Every key is one scalar; a multi-character
+    /// entry would silently never match, so it is asserted rather than assumed.
+    private static let symbolCommands: [Character: String] = {
+        var map: [Character: String] = [:]
+        for (plain, latex) in symbols {
+            precondition(plain.count == 1, "symbol table entry is not one character: \(plain)")
+            map[Character(plain)] = latex
+        }
+        return map
+    }()
 
     /// Unicode a model reaches for instead of the command.
     ///

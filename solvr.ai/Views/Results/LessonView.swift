@@ -68,7 +68,10 @@ struct ErrorCard: View {
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
 
-            if let onRetry {
+            // Two failures cannot be retried into success -- there is no
+            // question to ask -- and a button that cannot work implies the
+            // failure was transient when it is permanent.
+            if let onRetry, error.isRetryable {
                 Button {
                     Haptics.light()
                     onRetry()

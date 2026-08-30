@@ -61,4 +61,37 @@ struct MathHTMLTests {
     func noDollarsNoChange() {
         #expect(MathHTML.processInlineMath("plain sentence") == "plain sentence")
     }
+
+    // MARK: - The element the page typesets into
+
+    @Test("display maths travels in an attribute, not as text in the document")
+    func mathElementCarriesItsTeX() {
+        let html = MathHTML.mathElement(#"\int_{0}^{1} 3x^{2}\,dx"#, cssClass: "math-block")
+        #expect(html == #"<div class="math-block" data-tex="\int_{0}^{1} 3x^{2}\,dx"></div>"#)
+        // Empty, so KaTeX's auto-render finds no text in it and cannot race the
+        // explicit render the page does.
+        #expect(html.hasSuffix("></div>"))
+    }
+
+    @Test("a quote in model output cannot end the attribute")
+    func quotesCannotEscapeTheAttribute() {
+        // `escapeLaTeX` leaves quotes alone, which is right for element content
+        // and would be a hole here: one `"` would close `data-tex` and the rest
+        // of the maths would be parsed as markup.
+        let html = MathHTML.mathElement(#"\text{say "yes"}"#, cssClass: "formula-math")
+        #expect(html.contains("&quot;yes&quot;"))
+        #expect(html.filter { $0 == "\"" }.count == 4)   // class="..." data-tex="..."
+    }
+
+    @Test("the three characters an HTML parser acts on are escaped in attributes too")
+    func attributeEscaping() {
+        #expect(MathHTML.escapeAttribute("a < b & c > d") == "a &lt; b &amp; c &gt; d")
+        #expect(MathHTML.escapeAttribute("it's") == "it&#39;s")
+    }
+
+    @Test("dollar delimiters are stripped on the way into the attribute")
+    func attributeStripsDollars() {
+        #expect(MathHTML.mathElement("$$x^2$$", cssClass: "c")
+                == #"<div class="c" data-tex="x^2"></div>"#)
+    }
 }

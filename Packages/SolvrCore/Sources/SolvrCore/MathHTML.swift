@@ -47,6 +47,39 @@ public enum MathHTML {
              .replacingOccurrences(of: "$", with: "")
     }
 
+    /// The element a block of display maths goes into.
+    ///
+    /// The page used to be handed `\[ … \]` and left to find it with KaTeX's
+    /// auto-render, which meant the LaTeX was *text in the document*: if it did
+    /// not parse, auto-render rendered it in red and there was nothing left to
+    /// fall back to. The maths now travels in an attribute and the element is
+    /// empty, so the page can try to typeset it, fail, and put the source back
+    /// as plain text -- an honest "this did not typeset" instead of red.
+    ///
+    /// The attribute is why this exists in the package rather than in
+    /// `HTMLBuilder`: a `"` inside an attribute value ends it, and every maths
+    /// string here is model output. `escapeLaTeX` was written for element
+    /// content and does not escape quotes, which is correct there and would be a
+    /// hole here.
+    public static func mathElement(_ latex: String, cssClass: String) -> String {
+        let tex = stripDollarDelimiters(latex)
+        return "<div class=\"\(cssClass)\" data-tex=\"\(escapeAttribute(tex))\"></div>"
+    }
+
+    /// Escape a string for use inside a double-quoted HTML attribute.
+    ///
+    /// Everything `escapeLaTeX` does, plus the two quote characters. The page
+    /// reads the value back with `getAttribute`, which returns the unescaped
+    /// text, so KaTeX still sees the original maths.
+    public static func escapeAttribute(_ text: String) -> String {
+        var result = text.replacingOccurrences(of: "&", with: "&amp;")
+        result = result.replacingOccurrences(of: "<", with: "&lt;")
+        result = result.replacingOccurrences(of: ">", with: "&gt;")
+        result = result.replacingOccurrences(of: "\"", with: "&quot;")
+        result = result.replacingOccurrences(of: "'", with: "&#39;")
+        return result
+    }
+
     /// Convert `$…$` inline delimiters in already-escaped prose to `\(…\)`.
     ///
     /// An odd number of dollars means the text is not delimited maths -- a price,

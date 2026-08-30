@@ -30,9 +30,7 @@ enum HTMLBuilder {
             """
 
             if let math = step.math, !math.isEmpty {
-                body += """
-                    <div class="math-block">\\[\(escapeLaTeX(math))\\]</div>
-                """
+                body += mathElement(math, cssClass: "math-block")
             }
 
             body += """
@@ -80,9 +78,7 @@ enum HTMLBuilder {
             """
 
             if let formula = section.formula, !formula.isEmpty {
-                body += """
-                <div class="formula-box">\\[\(escapeLaTeX(formula))\\]</div>
-                """
+                body += mathElement(formula, cssClass: "formula-box")
             }
 
             if let note = section.note, !note.isEmpty {
@@ -150,7 +146,7 @@ enum HTMLBuilder {
                 <div class="formula-header">
                     <span class="formula-name">\(escapeHTML(formula.name.uppercased()))</span>
                 </div>
-                <div class="formula-math">\\[\(escapeLaTeX(formula.formula))\\]</div>
+                \(mathElement(formula.formula, cssClass: "formula-math"))
                 <div class="formula-desc">\(processInlineMath(escapeHTML(formula.description)))</div>
             </div>
             """
@@ -181,13 +177,27 @@ enum HTMLBuilder {
         \(KaTeXAssets.styleTag)
         \(KaTeXAssets.scriptTag)
         <script>
-            // Inlined rather than linked, so this runs with no network at all --
-            // which an app that can answer on device has to be able to do.
-            // `throwOnError: false` stays: one malformed formula should degrade to
-            // red text, not blank the page. It does mean invalid LaTeX fails
-            // silently here, which is why the evaluation harness renders the same
-            // strings with `throwOnError: true` and counts what breaks.
-            document.addEventListener("DOMContentLoaded", function () {
+            // Nothing is shown as maths without being parsed first.
+            //
+            // This used to be one `renderMathInElement` call with
+            // `throwOnError: false`, which renders a string KaTeX cannot parse
+            // in red and carries on. That is a reasonable default for a page and
+            // a bad one for this app: the failures are silent, they look like
+            // the model being wrong rather than us being wrong, and a student
+            // has no way to tell the difference. `\\intx^n dx` shipped like that.
+            //
+            // So display maths arrives in a `data-tex` attribute on an empty
+            // element and is typeset explicitly with `throwOnError: true`. When
+            // it throws, the element gets the source text instead, marked as
+            // untypeset -- honest, legible, and obviously not the intended
+            // rendering. Every failure is reported back to the app, which is
+            // what lets the device self test assert that a real page rendered
+            // with nothing broken in it.
+            var solvrRenderFailures = [];
+
+            function renderInlineMath() {
+                // Prose first, while the display elements are still empty, so
+                // auto-render never walks into markup KaTeX has produced.
                 renderMathInElement(document.body, {
                     delimiters: [
                         {left: '$$', right: '$$', display: true},
@@ -195,10 +205,55 @@ enum HTMLBuilder {
                         {left: '$', right: '$', display: false},
                         {left: '\\\\(', right: '\\\\)', display: false}
                     ],
-                    throwOnError: false
+                    throwOnError: true,
+                    // auto-render already puts the original text back when a
+                    // parse throws; this is only how we get to hear about it.
+                    errorCallback: function (message, error) {
+                        solvrRenderFailures.push({
+                            tex: '(inline)', message: String(message)
+                        });
+                    }
                 });
+            }
+
+            function renderDisplayMath() {
+                var blocks = document.querySelectorAll('[data-tex]');
+                for (var i = 0; i < blocks.length; i++) {
+                    var element = blocks[i];
+                    var tex = element.getAttribute('data-tex');
+                    try {
+                        katex.render(tex, element, {
+                            throwOnError: true, displayMode: true
+                        });
+                    } catch (e) {
+                        element.classList.add('untypeset');
+                        element.textContent = tex;
+                        solvrRenderFailures.push({
+                            tex: tex, message: String(e.message)
+                        });
+                    }
+                }
+                return blocks.length;
+            }
+
+            function reportRender(total) {
+                try {
+                    window.webkit.messageHandlers.solvrRender.postMessage({
+                        total: total, failures: solvrRenderFailures
+                    });
+                } catch (e) {
+                    // No handler attached. The page still renders; only the
+                    // measurement is unavailable.
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                renderInlineMath();
+                var total = renderDisplayMath();
                 scaleMath();
+                reportRender(total);
             });
+        </script>
         </script>
         <style>
             :root {
@@ -234,6 +289,28 @@ enum HTMLBuilder {
                 background: transparent;
             }
             .katex { font-size: 1.05em; white-space:normal !important; }
+            /* Maths that would not parse. Shown as what the model wrote, in a
+               typeface that does not pretend to be typeset, with a line saying
+               so -- rather than in red, which reads as the maths being wrong
+               instead of the rendering having failed. */
+            .untypeset {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 13px;
+                text-align: left;
+                white-space: pre-wrap;
+                word-break: break-word;
+                color: var(--text-secondary);
+                border-left: 3px solid var(--text-tertiary);
+                padding-left: 10px;
+            }
+            .untypeset::after {
+                content: "could not be typeset — shown as written";
+                display: block;
+                margin-top: 6px;
+                font-family: -apple-system, system-ui, sans-serif;
+                font-size: 11px;
+                color: var(--text-tertiary);
+            }
             .katex-display {
                 margin: 12px 0;
                 overflow-x: hidden !important;
@@ -299,11 +376,11 @@ enum HTMLBuilder {
         LLMJSON.escapeHTML(text)
     }
 
-    /// Preserves LaTeX backslashes while neutralising the three characters an
-    /// HTML parser would act on. Implemented in `SolvrCore.MathHTML` so it is
-    /// covered by `swift test`; see there for what went wrong without it.
-    private static func escapeLaTeX(_ latex: String) -> String {
-        MathHTML.escapeLaTeX(latex)
+    /// An empty element carrying its LaTeX in an attribute, for the page to
+    /// typeset -- or to degrade honestly when it will not parse. Implemented in
+    /// `SolvrCore.MathHTML` so it is covered by `swift test`.
+    private static func mathElement(_ latex: String, cssClass: String) -> String {
+        MathHTML.mathElement(latex, cssClass: cssClass)
     }
 
     /// Converts `$...$` inline delimiters in HTML-escaped text to `\(...\)` for
