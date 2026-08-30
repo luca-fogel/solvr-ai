@@ -89,7 +89,12 @@ public enum MathNotation {
     }
 
     /// Unicode a model reaches for instead of the command.
-    private static let symbols: [(String, String)] = [
+    ///
+    /// Internal rather than private so the tests can walk it: every entry is a
+    /// LaTeX control word, and a control word has to be terminated before a
+    /// letter. Asserting that for the table itself is the only way to keep a
+    /// symbol added later from repeating `\intx`.
+    static let symbols: [(String, String)] = [
         ("∫", "\\int"), ("∑", "\\sum"), ("∏", "\\prod"),
         ("∂", "\\partial"), ("∇", "\\nabla"), ("∞", "\\infty"),
         ("≠", "\\neq"), ("≤", "\\leq"), ("≥", "\\geq"), ("≈", "\\approx"),
