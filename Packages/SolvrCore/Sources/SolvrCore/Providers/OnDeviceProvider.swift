@@ -37,9 +37,29 @@ public final class OnDeviceProvider: SolutionProvider {
     /// Serialised deliberately: see `concurrentRequests` above.
     private let queue = RequestQueue(maxConcurrent: 1)
     private let observe: (@Sendable (String, TimeInterval, String?) -> Void)?
+    private let traceMath: (@Sendable (MathTrace) -> Void)?
 
-    public init(observe: (@Sendable (String, TimeInterval, String?) -> Void)? = nil) {
+    /// What the model wrote in a maths field, and what became of it.
+    ///
+    /// The app converts every `math` field through `MathNotation` and drops the
+    /// ones that read as prose, both of which happen before anything can record
+    /// them -- so until this existed there was no way to tell a model that got
+    /// the maths wrong from a converter that mangled maths that was right. The
+    /// evaluation harness passes a closure; the app passes nil and pays nothing.
+    public struct MathTrace: Sendable, Hashable {
+        public let surface: String
+        /// Exactly what the model generated, before any conversion.
+        public let raw: String
+        /// What the app will render, or nil if the field was dropped.
+        public let rendered: String?
+        /// True when the field was discarded for reading as a sentence.
+        public let droppedAsProse: Bool
+    }
+
+    public init(observe: (@Sendable (String, TimeInterval, String?) -> Void)? = nil,
+                traceMath: (@Sendable (MathTrace) -> Void)? = nil) {
         self.observe = observe
+        self.traceMath = traceMath
     }
 
     // MARK: - SolutionProvider
@@ -94,9 +114,19 @@ public final class OnDeviceProvider: SolutionProvider {
 
     @Generable
     struct GeneratedSolution {
-        @Guide(description: "The worked steps in order. The last one states the final answer.",
+        @Guide(description: "The worked steps in order, from the problem to the answer.",
                .count(3...6))
         var steps: [GeneratedStep]
+        // Declared last, for the reason `GeneratedLesson.title` is: guided
+        // generation fills fields in declaration order, so a field asked for
+        // after the working has been written is a field the model can answer
+        // from its own working rather than guess at.
+        @Guide(description: """
+            The final answer on its own, in LaTeX with no dollar delimiters and \
+            no words -- for example x = \\frac{2}{3} or 30. Just the result the \
+            steps arrived at.
+            """)
+        var finalAnswer: String
     }
 
     @Generable
@@ -202,16 +232,50 @@ public final class OnDeviceProvider: SolutionProvider {
             """,
             prompt: "Solve this problem step by step: \(text)")
 
-        return solution.steps.enumerated().map { index, step in
-            StepItem(step: index + 1,
-                     title: step.title,
-                     explanation: step.explanation,
-                     // Measured, not defensive: this model returns correct maths
-                     // in the wrong notation no matter how the guide is worded --
-                     // and sometimes returns a whole sentence, which renders as
-                     // garbled italics and drags the page width with it.
-                     math: Self.renderableMath(step.math))
+        var items = solution.steps.enumerated().map { index, step in
+            // Measured, not defensive: this model returns correct maths in the
+            // wrong notation no matter how the guide is worded -- and sometimes
+            // returns a whole sentence, which renders as garbled italics and
+            // drags the page width with it. That sentence is moved next to the
+            // explanation rather than deleted.
+            let rendered = renderMath(step.math, surface: "steps")
+            return StepItem(step: index + 1,
+                            title: step.title,
+                            explanation: Self.merging(step.explanation, prose: rendered.prose),
+                            math: rendered.math)
         }
+
+        // The model states the answer once more, on its own, as the last field
+        // it generates. Everything downstream used to infer it from "the last
+        // step that shows any working", which is a guess that is wrong exactly
+        // when the solution was cut short -- the case where being wrong matters.
+        let answer = renderMath(solution.finalAnswer, surface: "steps")
+        if let math = answer.math, !math.isEmpty {
+            if items.last?.math == math {
+                items[items.count - 1].isFinalAnswer = true
+            } else {
+                items.append(StepItem(step: items.count + 1,
+                                      title: "Final answer",
+                                      explanation: "",
+                                      math: math,
+                                      isFinalAnswer: true))
+            }
+        } else if let prose = answer.prose, !prose.isEmpty {
+            // The model sometimes answers this field in words -- "The
+            // determinant of the matrix is 1". That is not maths and must not go
+            // in a maths box, but it is still the answer, and dropping it left
+            // the last *working* step marked as the conclusion instead.
+            items.append(StepItem(step: items.count + 1,
+                                  title: "Final answer",
+                                  explanation: prose,
+                                  math: nil,
+                                  isFinalAnswer: true))
+        } else if !items.isEmpty {
+            // Nothing usable in the field: fall back to the last step, which is
+            // where the answer is if it is anywhere.
+            items[items.count - 1].isFinalAnswer = true
+        }
+        return items
     }
 
     public func lesson(for problem: ProblemInput) async throws -> LessonContent {
@@ -231,7 +295,7 @@ public final class OnDeviceProvider: SolutionProvider {
             sections: lesson.sections.map {
                 LessonContent.LessonSection(heading: $0.heading,
                                             content: $0.content,
-                                            formula: Self.renderableMath($0.formula),
+                                            formula: renderableMath($0.formula, surface: "lesson"),
                                             note: nil,
                                             steps: nil)
             },
@@ -247,7 +311,7 @@ public final class OnDeviceProvider: SolutionProvider {
 
         return generated.formulas.map {
             FormulaItem(name: $0.name,
-                        formula: Self.renderableMath($0.formula) ?? "",
+                        formula: renderableMath($0.formula, surface: "formulas") ?? "",
                         description: $0.description)
         }
     }
@@ -290,8 +354,9 @@ public final class OnDeviceProvider: SolutionProvider {
             let session = LanguageModelSession(model: .default) {
                 """
                 You are a friendly, patient maths tutor. The student is working on: \
-                \(problem). Answer their follow-up clearly and encouragingly, in a \
-                short paragraph. If they seem confused, try an analogy.
+                \(MathNotation.plainForModel(problem)). Answer their follow-up clearly \
+                and encouragingly, in a short paragraph. If they seem confused, try an \
+                analogy.
                 """
             }
             let prompt = recent.isEmpty ? message : "\(recent)\nStudent: \(message)"
@@ -316,16 +381,54 @@ public final class OnDeviceProvider: SolutionProvider {
         return title
     }
 
-    /// A maths field the app can actually render, or nil.
+    /// What a maths field turned into: something renderable, a sentence, or nothing.
     ///
-    /// Converts notation where that is possible, and drops the field where the
-    /// model wrote a sentence instead of an expression. Nil is a supported value
-    /// everywhere it is used -- the step shows without a working box -- and an
-    /// absent box reads far better than a wrong one.
-    private static func renderableMath(_ raw: String) -> String? {
+    /// Both halves are needed by the caller. The old version returned `String?`
+    /// and threw the sentence away, which is why a step could arrive with an
+    /// explanation and no working at all and no trace of why.
+    struct RenderedMath {
+        let math: String?
+        let prose: String?
+    }
+
+    /// Convert a maths field for rendering, keeping what cannot be converted.
+    ///
+    /// Converts notation where that is possible, and separates out the case
+    /// where the model wrote a sentence instead of an expression -- KaTeX
+    /// renders a sentence as run-together italics wide enough to shove the page
+    /// sideways, so it must not go in the maths box, but it is still something
+    /// the model meant to say and the caller folds it into the explanation.
+    private func renderMath(_ raw: String, surface: String) -> RenderedMath {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !MathNotation.looksLikeProse(trimmed) else { return nil }
-        return MathNotation.toLaTeX(trimmed)
+        guard !trimmed.isEmpty else {
+            return RenderedMath(math: nil, prose: nil)
+        }
+        if MathNotation.looksLikeProse(trimmed) {
+            traceMath?(MathTrace(surface: surface, raw: trimmed,
+                                 rendered: nil, droppedAsProse: true))
+            return RenderedMath(math: nil, prose: trimmed)
+        }
+        let converted = MathNotation.toLaTeX(trimmed)
+        traceMath?(MathTrace(surface: surface, raw: trimmed,
+                             rendered: converted, droppedAsProse: false))
+        return RenderedMath(math: converted, prose: nil)
+    }
+
+    /// A maths field for a surface that has nowhere to put a stray sentence.
+    private func renderableMath(_ raw: String, surface: String) -> String? {
+        renderMath(raw, surface: surface).math
+    }
+
+    /// Fold a sentence the model misfiled as maths back into the prose beside it.
+    ///
+    /// Pure and separate so it can be tested without a model. Idempotent: a
+    /// sentence already contained in the explanation is not repeated.
+    static func merging(_ explanation: String, prose: String?) -> String {
+        guard let prose, !prose.isEmpty else { return explanation }
+        let trimmed = explanation.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return prose }
+        guard !trimmed.contains(prose) else { return trimmed }
+        return trimmed + " " + prose
     }
 
     // MARK: - Generation
@@ -344,7 +447,11 @@ public final class OnDeviceProvider: SolutionProvider {
                 reason: "The on-device model cannot read images. "
                       + "Text recognition should have run first.")
         }
-        return text
+        // Every prompt goes through this. `x³` made the model refuse outright
+        // and `·` made it generate past its own context window -- see
+        // `MathNotation.plainForModel`, where both are recorded with the runs
+        // that found them.
+        return MathNotation.plainForModel(text)
     }
 
     /// One guided generation, with the schema kept out of the prompt.

@@ -22,11 +22,21 @@ public struct StepItem: Codable, Identifiable, Sendable {
     public let explanation: String
     public let math: String?
 
-    public init(step: Int, title: String, explanation: String, math: String?) {
+    /// Whether this step carries the answer.
+    ///
+    /// The renderer used to assume the last step was the answer and relabel it
+    /// "Final Answer", which threw away the model's own heading and asserted a
+    /// conclusion even when generation had been cut off mid-working. The
+    /// provider now says so explicitly, and says nothing when it does not know.
+    public var isFinalAnswer: Bool
+
+    public init(step: Int, title: String, explanation: String, math: String?,
+                isFinalAnswer: Bool = false) {
         self.step = step
         self.title = title
         self.explanation = explanation
         self.math = math
+        self.isFinalAnswer = isFinalAnswer
     }
 
     public init(from decoder: Decoder) throws {
@@ -35,9 +45,12 @@ public struct StepItem: Codable, Identifiable, Sendable {
         title = (try? container.decode(String.self, forKey: .title)) ?? "Step"
         explanation = (try? container.decode(String.self, forKey: .explanation)) ?? ""
         math = try? container.decodeIfPresent(String.self, forKey: .math)
+        // Absent in solutions saved before the field existed. False is the safe
+        // reading: an unmarked step is one the app will not label as an answer.
+        isFinalAnswer = (try? container.decode(Bool.self, forKey: .isFinalAnswer)) ?? false
     }
 
     private enum CodingKeys: String, CodingKey {
-        case step, title, explanation, math
+        case step, title, explanation, math, isFinalAnswer
     }
 }
