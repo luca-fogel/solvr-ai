@@ -61,3 +61,6 @@ docs/HANDOVER.md
 
 # swift test transcript, captured by CI
 test.log
+
+# The 225 arm keeps its config and its provenance, not its weights.
+tools/finetune/adapters-225/*.safetensors

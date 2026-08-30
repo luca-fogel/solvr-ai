@@ -1,0 +1,41 @@
+{
+    "adapter_path": "tools/finetune/adapters",
+    "batch_size": 1,
+    "clear_cache_threshold": 0,
+    "config": "tools/finetune/lora-qwen3-4b.yaml",
+    "data": "tools/finetune/data",
+    "fine_tune_type": "lora",
+    "grad_accumulation_steps": 4,
+    "grad_checkpoint": false,
+    "iters": 75,
+    "learning_rate": 1e-05,
+    "lora_parameters": {
+        "rank": 8,
+        "dropout": 0.0,
+        "scale": 20.0
+    },
+    "lr_schedule": null,
+    "mask_prompt": true,
+    "max_seq_length": 1792,
+    "model": "mlx-community/Qwen3-4B-4bit",
+    "num_layers": 8,
+    "optimizer": "adamw",
+    "optimizer_config": {
+        "adam": {},
+        "adamw": {},
+        "muon": {},
+        "sgd": {},
+        "adafactor": {}
+    },
+    "project_name": null,
+    "report_to": null,
+    "resume_adapter_file": "tools/finetune/adapters/adapters.safetensors",
+    "save_every": 25,
+    "seed": 20260822,
+    "steps_per_eval": 100,
+    "steps_per_report": 25,
+    "test": false,
+    "test_batches": 500,
+    "train": true,
+    "val_batches": 2
+}
