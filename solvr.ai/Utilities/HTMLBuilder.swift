@@ -26,7 +26,7 @@ enum HTMLBuilder {
                 </div>
                 <div class="step-content">
                     <div class="step-title">\(escapeHTML(step.title))\(badge)</div>
-                    <div class="step-explanation">\(escapeHTML(step.explanation))</div>
+                    <div class="step-explanation">\(processInlineMath(escapeHTML(step.explanation)))</div>
             """
 
             if let math = step.math, !math.isEmpty {
@@ -151,7 +151,7 @@ enum HTMLBuilder {
                     <span class="formula-name">\(escapeHTML(formula.name.uppercased()))</span>
                 </div>
                 <div class="formula-math">\\[\(escapeLaTeX(formula.formula))\\]</div>
-                <div class="formula-desc">\(escapeHTML(formula.description))</div>
+                <div class="formula-desc">\(processInlineMath(escapeHTML(formula.description)))</div>
             </div>
             """
         }
