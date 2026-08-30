@@ -25,6 +25,20 @@ struct Options {
     var backend = "demo"
     var limit: Int?
     var output = "eval-results.jsonl"
+    /// Which problems to run. `corpus` is the historical 43, kept as the default
+    /// so an old command line still produces a comparable run.
+    var set = "corpus"
+    /// One ad-hoc problem, for asking "does this exact wording fail?" without
+    /// editing a dataset. Two of the app's six sample problems failed on every
+    /// run -- one refused, one overflowed the context window -- and finding the
+    /// wording that does not is a matter of trying wordings.
+    var problem: String?
+    var expect: String?
+
+    /// How many times to run each problem. Greedy decoding makes a single run
+    /// reproducible, not reliable: the point of repeating is to see whether a
+    /// problem is answered the same way every time.
+    var repeats = 1
 }
 
 func parseOptions() -> Options {
@@ -43,10 +57,22 @@ func parseOptions() -> Options {
         switch flag {
         case "--backend": o.backend = value()
         case "--limit": o.limit = Int(value())
+        case "--set": o.set = value()
+        case "--problem": o.problem = value()
+        case "--expect": o.expect = value()
+        case "--repeat": o.repeats = max(1, Int(value()) ?? 1)
         case "--out": o.output = value()
         case "--help", "-h":
             print("""
-            solvr-eval --backend <demo|on-device> [--limit N] [--out file.jsonl]
+            solvr-eval --backend <demo|on-device> [--set corpus|samples|all]
+                       [--limit N] [--repeat N] [--out file.jsonl]
+
+            Sets:
+              corpus      the 43-problem corpus in problems.json (default)
+              samples     the six problems the app's topic chips insert, taken
+                          from SolvrCore.SampleProblems so the measured text is
+                          byte-identical to the tapped text
+              all         both
 
             Backends:
               demo        bundled fixtures. No model, no network, no spend. Still
@@ -82,10 +108,26 @@ struct Problem: Decodable {
     let problem: String
     let answer: String
     let numeric: Double?
+
+    init(id: String, topic: String, problem: String, answer: String, numeric: Double?) {
+        self.id = id
+        self.topic = topic
+        self.problem = problem
+        self.answer = answer
+        self.numeric = numeric
+    }
 }
 
 struct ProblemFile: Decodable {
     let problems: [Problem]
+}
+
+/// The chip problems, as the harness sees them.
+func sampleProblems() -> [Problem] {
+    SampleProblems.all.map {
+        Problem(id: $0.id, topic: $0.topic.lowercased(), problem: $0.text,
+                answer: $0.expectedAnswer, numeric: $0.expectedNumeric)
+    }
 }
 
 func loadProblems() -> [Problem] {
@@ -128,6 +170,42 @@ struct Record: Encodable {
     var expectedAnswer: String
     var expectedNumeric: Double?
     var error: String?
+
+    /// Which repetition this is, 1-based. Greedy decoding is reproducible in
+    /// principle; whether it is in practice is a thing to measure, not assume.
+    var runIndex: Int = 1
+
+    /// The maths exactly as the model wrote it, before `MathNotation` touched it.
+    ///
+    /// `latex` above is the converted form -- what the app renders. Recording
+    /// both is the only way to attribute a broken formula to the model or to the
+    /// converter, and until this existed nobody could say which.
+    var rawMath: [String] = []
+
+    /// Fields the app discarded because they read as a sentence, not an
+    /// expression. A high count here is a missing working box on screen.
+    var droppedAsProse: [String] = []
+}
+
+/// Collects the provider's per-field maths traces, keyed by surface.
+///
+/// Stores plain strings rather than the provider's `MathTrace`: that type only
+/// exists where `FoundationModels` does, and this actor has to compile on the
+/// demo arm too.
+actor MathTraces {
+    private var raw: [String: [String]] = [:]
+    private var dropped: [String: [String]] = [:]
+
+    func record(surface: String, raw text: String, droppedAsProse: Bool) {
+        raw[surface, default: []].append(text)
+        if droppedAsProse { dropped[surface, default: []].append(text) }
+    }
+
+    /// Raw strings, and the ones dropped as prose. Clears as it reads, so each
+    /// request sees only its own fields.
+    func take(_ surface: String) -> ([String], [String]) {
+        (raw.removeValue(forKey: surface) ?? [], dropped.removeValue(forKey: surface) ?? [])
+    }
 }
 
 /// Collects what the provider reports about each request, keyed by surface.
@@ -158,7 +236,13 @@ actor Telemetry {
 
 func latexAndAnswer(from steps: [StepItem]) -> ([String], String?) {
     let latex = steps.compactMap { $0.math }.filter { !$0.isEmpty }
-    let answer = steps.last.map { step -> String in
+    // The provider marks the step carrying the answer, because the model is now
+    // asked for it as its own field. Falling back to "the last step" is kept for
+    // solutions that predate the field, but it is a guess and it was wrong
+    // exactly when the working ran long: the grader would be handed a sentence
+    // like "Step 4: Conclude the solution" and return `undecidable`.
+    let answerStep = steps.last(where: { $0.isFinalAnswer }) ?? steps.last
+    let answer = answerStep.map { step -> String in
         if let math = step.math, !math.isEmpty { return math }
         return step.explanation
     }
@@ -176,22 +260,50 @@ func latex(from formulas: [FormulaItem]) -> [String] {
 // MARK: - Run
 
 let options = parseOptions()
-let problems = Array(loadProblems().prefix(options.limit ?? .max))
+let selected: [Problem]
+if let ad = options.problem {
+    selected = [Problem(id: "adhoc", topic: "adhoc", problem: ad,
+                        answer: options.expect ?? "", numeric: nil)]
+} else {
+switch options.set {
+case "corpus": selected = loadProblems()
+case "samples": selected = sampleProblems()
+case "all": selected = sampleProblems() + loadProblems()
+default:
+    FileHandle.standardError.write(Data("unknown --set \(options.set)\n".utf8))
+    exit(2)
+}
+}
+let problems = Array(selected.prefix(options.limit ?? .max))
 let telemetry = Telemetry()
+let traces = MathTraces()
 
 let provider: any SolutionProvider
 switch options.backend {
 case "demo":
+    #if SOLVR_DEMO
     provider = FixtureSolutionProvider(latency: .zero) { surface, compliance in
         Task { await telemetry.record(surface, compliance) }
     }
+    #else
+    FileHandle.standardError.write(Data("""
+        the demo arm is compiled out of release builds -- the fixtures ship in no
+        binary a student could install. Run the harness in debug (the default) to
+        use --backend demo.
+
+        """.utf8))
+    exit(1)
+    #endif
 case "on-device":
     #if canImport(FoundationModels)
     guard #available(macOS 26.0, *) else {
         FileHandle.standardError.write(Data("--backend on-device needs macOS 26 or newer\n".utf8))
         exit(1)
     }
-    let onDevice = OnDeviceProvider()
+    let onDevice = OnDeviceProvider(traceMath: { t in
+        Task { await traces.record(surface: t.surface, raw: t.raw,
+                                   droppedAsProse: t.droppedAsProse) }
+    })
     // Availability is checked once, before the run, so an ineligible machine
     // fails in one line rather than in 43 identical ones.
     if let unavailable = onDevice.availability {
@@ -230,13 +342,15 @@ func emit(_ record: Record) {
 }
 
 print("backend: \(provider.identifier)")
-print("problems: \(problems.count)   surfaces: steps, lesson, formulas")
+print("problems: \(problems.count) (\(options.set))   repeats: \(options.repeats)   "
+      + "surfaces: steps, lesson, formulas")
 print("writing:  \(options.output)")
 print("note:     requests run one at a time so latency is not distorted by queueing")
 print("")
 
 var completed = 0
 for problem in problems {
+  for run in 1...options.repeats {
     let input = ProblemInput.text(problem.problem)
 
     // Steps first: it is the surface the answer grading depends on.
@@ -246,6 +360,7 @@ for problem in problems {
         let latency = Date().timeIntervalSince(clock)
         let (tex, answer) = latexAndAnswer(from: steps)
         let (compliance, input_, output_) = await telemetry.take("steps")
+        let (rawTex, droppedTex) = await traces.take("steps")
         emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
                     surface: "steps", ok: true, latencySeconds: latency,
                     inputTokens: input_, outputTokens: output_, timeToFirstTokenSeconds: nil,
@@ -254,7 +369,7 @@ for problem in problems {
                     wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
                     latex: tex, itemCount: steps.count, finalAnswer: answer,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: nil))
+                    error: nil, runIndex: run, rawMath: rawTex, droppedAsProse: droppedTex))
     } catch {
         emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
                     surface: "steps", ok: false, latencySeconds: 0,
@@ -263,7 +378,7 @@ for problem in problems {
                     wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
                     finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: "\(error)"))
+                    error: "\(error)", runIndex: run))
     }
 
     do {
@@ -271,6 +386,7 @@ for problem in problems {
         let lesson = try await provider.lesson(for: input)
         let latency = Date().timeIntervalSince(clock)
         let (compliance, input_, output_) = await telemetry.take("lesson")
+        let (rawTex, droppedTex) = await traces.take("lesson")
         emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
                     surface: "lesson", ok: true, latencySeconds: latency,
                     inputTokens: input_, outputTokens: output_, timeToFirstTokenSeconds: nil,
@@ -280,7 +396,7 @@ for problem in problems {
                     latex: latex(from: lesson), itemCount: lesson.sections.count,
                     finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: nil))
+                    error: nil, runIndex: run, rawMath: rawTex, droppedAsProse: droppedTex))
     } catch {
         emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
                     surface: "lesson", ok: false, latencySeconds: 0,
@@ -289,7 +405,7 @@ for problem in problems {
                     wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
                     finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: "\(error)"))
+                    error: "\(error)", runIndex: run))
     }
 
     do {
@@ -297,6 +413,7 @@ for problem in problems {
         let formulas = try await provider.formulas(for: input)
         let latency = Date().timeIntervalSince(clock)
         let (compliance, input_, output_) = await telemetry.take("formulas")
+        let (rawTex, droppedTex) = await traces.take("formulas")
         emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
                     surface: "formulas", ok: true, latencySeconds: latency,
                     inputTokens: input_, outputTokens: output_, timeToFirstTokenSeconds: nil,
@@ -306,7 +423,7 @@ for problem in problems {
                     latex: latex(from: formulas), itemCount: formulas.count,
                     finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: nil))
+                    error: nil, runIndex: run, rawMath: rawTex, droppedAsProse: droppedTex))
     } catch {
         emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
                     surface: "formulas", ok: false, latencySeconds: 0,
@@ -315,11 +432,13 @@ for problem in problems {
                     wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
                     finalAnswer: nil,
                     expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: "\(error)"))
+                    error: "\(error)", runIndex: run))
     }
 
     completed += 1
-    FileHandle.standardError.write(Data("\r\(completed)/\(problems.count) problems".utf8))
+    FileHandle.standardError.write(
+        Data("\r\(completed)/\(problems.count * options.repeats) runs".utf8))
+  }
 }
 FileHandle.standardError.write(Data("\n".utf8))
 try? out.close()
