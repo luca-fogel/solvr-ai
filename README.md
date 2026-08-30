@@ -27,29 +27,34 @@ over — the working, the concept, the formulas, and answers to "but why".
 ## What it does
 
 ```
-photo ──────────► a backend that can see reads it directly;
-                  one that cannot gets it via on-device text recognition
-                                          │
-typed problem ────────────────────────────┤
-                                          ▼
-                              four requests, in parallel
-                                          │
-        ┌──────────────┬──────────────┬───┴──────────┬──────────────┐
+photo ──────────►  read once, on device, by Vision
+                          │
+                          ▼          ← and shown to you, because it is
+typed problem ──────────► the question   the only thing you can check
+                          │
+        ┌──────────────┬──┴───────────┬──────────────┬──────────────┐
         ▼              ▼              ▼              ▼              ▼
       Steps         Lesson        Formulas        Videos          Chat
    worked, with   the concept   with the ones   related, by     follow-up
    the reason     behind it     that apply      search terms    questions
 ```
 
+Every one of those is asked about the same string, and it is the string on
+screen. That is a stronger claim than it sounds — it was not true until this
+release, and the [engineering notes](docs/ENGINEERING-NOTES.md) explain what a
+photograph of an integral produced while it was false.
+
 Maths is rendered as real typeset notation through KaTeX in a web view, not as
-plain-text approximations of fractions and integrals.
+plain-text approximations of fractions and integrals. Anything that will not
+typeset is shown as what the model wrote, in monospace, saying so — never in
+red.
 
 ## The screens
 
 | | | |
 |:--:|:--:|:--:|
 | ![Home](docs/images/home.png) | ![Steps](docs/images/steps.png) | ![Lesson](docs/images/lesson.png) |
-| **Scan** — a crop overlay and live problem detection | **Steps** — each one says which rule applies and why | **Lesson** — the concept, written as a tutor would explain it |
+| **Scan** — a crop overlay, and the text it read shown back to you | **Steps** — each one says which rule applies and why | **Lesson** — the concept, written as a tutor would explain it |
 | ![Formulas](docs/images/formulas.png) | ![Chat](docs/images/chat.png) | ![History](docs/images/history.png) |
 | **Formulas** — the ones that actually apply here | **Chat** — follow-ups, with the problem as context | **History** — every problem, stored locally with SwiftData |
 
@@ -124,21 +129,29 @@ local, in `Packages/`.
 
 ```
 solvr.ai/
-  Models/          Codable response types, plus the SwiftData Problem
+  Models/          the SwiftData Problem — a label *and* the question it was asked
   Services/        ProviderFactory, OCRService, CameraManager, LegacyCredentialPurge
-  ViewModels/      one per screen; none of them know how a request was made
+  ViewModels/      thin adapters onto SolvrCore; none of them decide what is asked
   Views/           Home · Scanner · Results (Steps/Lesson/Formulas/Videos/Chat) · History · Settings
   Utilities/       Theme, HTMLBuilder (KaTeX), PlatformHelper
-  DemoMode/        fixtures, the drawn worksheet, launch-argument wiring
+  DemoMode/        fixtures, the drawn worksheet, the two on-device self tests
 Packages/SolvrCore/  the text handling that is worth testing, and its 107 tests
+  Solve            one problem, resolved once — the only string a prompt is built from
+  SolveBuilder     reads the photograph, and is the only way to make a Solve
+  SolveCoordinator which surfaces have been asked for, and what came back
 ```
 
 `SolvrCore` is a local Swift package holding everything that is pure text
 processing: the model-output decode ladder, the LaTeX escape repair, HTML
-escaping, and the request queue. It imports only Foundation, so
-`swift test --package-path Packages/SolvrCore` runs the whole suite in about two
-seconds with no Xcode, no simulator and no API key. Anything that cannot be
-tested that way stays in the app.
+escaping, the request queue — and, since this release, **the code that decides
+what the model is asked**. That moved out of the app on purpose. The worst bug
+this project has had lived in a view model, in the difference between the string
+being displayed and the string being asked about, and there was no test in the
+repository that could reach it.
+
+It imports only Foundation, so `swift test --package-path Packages/SolvrCore`
+runs the whole suite in about two seconds with no Xcode, no simulator and no API
+key. Anything that cannot be tested that way stays in the app.
 
 ## The part worth reading
 
@@ -157,6 +170,22 @@ The repair itself has one rule: **it may never damage input that was already
 valid.** The previous version doubled every backslash it found, which fixed
 `\frac` and simultaneously turned a legitimate `\"` into a literal backslash
 followed by an unescaped quote.
+
+That rule turns out to be the whole story, and it was being broken somewhere
+else. The notation converter that rewrites what the on-device model writes had
+produced three separate corruption bugs, and the third was thirty bugs: a LaTeX
+control word runs to the first non-letter, so substituting the integral sign into
+`∫x^n dx` gives `\intx^n dx`, which is not a command. **KaTeX renders every one
+of those Unicode characters as it stands** — so the converter was taking strings
+that worked and producing strings that did not.
+
+The fix is not a better converter. It is that the converter is *checked*, by the
+only thing qualified to check it. `swift test` loads the app's own
+`katex.min.js` into a `JSContext` — `renderToString` needs no DOM, eight
+milliseconds to load, half a millisecond a string — and asserts that no
+conversion breaks a string that already rendered, over the maths the model
+actually wrote in the published records. It found two live regressions on the
+first run.
 
 ## Tests
 
@@ -217,6 +246,36 @@ three runs agree with each other by construction. The number to take seriously
 is the one on the left: a third of the examples the app shipped with did not
 work at all, and nothing measured them.
 
+### And a whole path that nothing had ever measured
+
+Everything above is **typed** text. The app's front door is a camera, and until
+this release no harness had ever been through it — which is how a photograph of
+`∫ 3x² + 2x + 4 dx` produced a lesson titled *Understanding Scanning*, formulas
+rendered in red, and five suggested videos called "Scanning", with every table on
+this page still green.
+
+There are two camera arms now. `solvr-eval --set camera` runs photographs with
+their contents written down beside them and grades **reading and solving
+separately**, because they are different failures with different fixes.
+`-SolvrCameraSelfTest YES` does the same on the phone and one thing more: it
+builds each surface's real page, loads it into a real `WKWebView` with the
+vendored KaTeX, and counts what would not typeset. The first device transcript,
+on an iPhone 15 Pro running a Release build:
+
+```
+question: • 3x + 2x + 4 dx          ← what Vision read
+expected: ∫ 3x² + 2x + 4 dx
+steps ok 5.0s · lesson ok 3.7s · formulas ok 3.3s · videos ok 1.6s
+asked 4 surfaces about one question: yes
+KaTeX: 10/10 display strings typeset under throwOnError: true
+```
+
+Both properties this release exists to establish, on the device that ships, in
+one run — and a recognition failure severe enough that the answer was never going
+to be right. That is the honest shape of this path, and it is
+[published](docs/evaluation-camera.md) with
+[the records](docs/eval-records/camera/).
+
 ## What it does not do
 
 - **Answering on a real device is confirmed; a full offline run is not yet
@@ -241,14 +300,17 @@ work at all, and nothing measured them.
   nothing left that sends the problem anywhere. The only outbound link in the app
   is the YouTube URL you get by tapping a suggested video, which hands off to
   another app rather than fetching anything itself.
-- **A photograph is harder than typed text, and there is no longer a backend
-  that makes it easier.** Apple's on-device model has no image input at all, so
-  every photo goes through Apple's Vision text recognition first, which reads
-  printed problems well, handwriting unevenly, and a fraction as two numbers with
-  a line between them. The hosted backend used to read the image natively; losing
-  that is the clearest thing this version gives up. That downgrade is
-  recorded per backend rather than glossed over, which is why a wrapped provider
-  reports itself as `<backend>+ocr`.
+- **A photograph is harder than typed text, and now there is a number for it.**
+  Apple's on-device model has no image input at all, so every photo goes through
+  Apple's Vision text recognition first. On the one fixture measured so far —
+  handwriting on a whiteboard — Vision reads `∫ 3x² + 2x + 4 dx` as
+  `• 3x + 2x + 4 dx`, on the Mac *and* on the phone: the integral sign becomes a
+  bullet and the exponent disappears. The model then answers that problem,
+  correctly, for the question it was given. **On this path the dominant failure
+  is recognition**, which is why the app now shows you what it read, and why
+  [evaluation-camera.md](docs/evaluation-camera.md) grades reading and solving
+  separately. Six more fixtures are wanted; the shot list is in
+  [docs/fixtures/camera/](docs/fixtures/camera/README.md).
 
 ## What the fine-tune actually did
 
@@ -296,6 +358,9 @@ adapter weights are **not** tracked: they are a build product, and
   the package, and where the JSON repair ladder actually earns its keep
 - [docs/evaluation.md](docs/evaluation.md) — how the backends are measured, what
   has and has not actually been run, and what is deliberately not measured
+- [docs/evaluation-camera.md](docs/evaluation-camera.md) — the camera path, read
+  and solved separately, on a Mac and on a phone; the photographs behind it are
+  in [docs/fixtures/camera/](docs/fixtures/camera/README.md)
 - [docs/eval-records/](docs/eval-records/) — the 387 graded records behind every
   number above, with the one command that regenerates the tables from them
 - [tools/finetune/README.md](tools/finetune/README.md) — the LoRA run on a 4B:
