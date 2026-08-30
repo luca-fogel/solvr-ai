@@ -671,6 +671,8 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .disabled(textProblem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel("Solve")
+                .accessibilityHint("Works the problem out on this device")
                 .padding(.horizontal, Theme.Spacing.lg)
 
                 Spacer()

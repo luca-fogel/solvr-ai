@@ -35,6 +35,8 @@ struct TabSelector: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Theme.Spacing.sm)
                 }
+                .accessibilityLabel(tab.label)
+                .accessibilityAddTraits(selectedTab == tab ? [.isSelected, .isButton] : .isButton)
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)

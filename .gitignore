@@ -25,6 +25,10 @@ Carthage/Build/
 *.env
 Secrets.plist
 
+# Local code-signing identity. Signing.xcconfig #include?s this file, so its
+# absence is not an error -- see that file for what to put in it.
+Local.xcconfig
+
 # Local agent / tooling state
 .claude-flow/
 .claude/

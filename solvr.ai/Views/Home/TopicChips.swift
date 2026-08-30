@@ -11,6 +11,10 @@ struct TopicChips: View {
                     TopicChip(title: topic) {
                         onSelect(topic)
                     }
+                    // VoiceOver reads "Algebra, button" otherwise, which does
+                    // not say that tapping fills the field with an example.
+                    .accessibilityLabel("\(topic) example")
+                    .accessibilityHint("Fills the box with an example \(topic.lowercased()) problem")
                 }
             }
             .padding(.horizontal, Theme.Spacing.lg)

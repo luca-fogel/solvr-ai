@@ -1,0 +1,21 @@
+// Code-signing identity, supplied locally rather than committed.
+//
+// This project deliberately carries no DEVELOPMENT_TEAM of its own. The
+// repository is public, and a team id belongs to whoever is building, not to
+// the source -- so a fresh clone has nothing to sign with and Xcode says
+// "Signing for 'solvr.ai' requires a development team."
+//
+// To build onto a device, create `Local.xcconfig` beside this file:
+//
+//     DEVELOPMENT_TEAM = YOURTEAMID
+//
+// Your team id is in Xcode under Settings -> Accounts -> Manage Certificates,
+// or via `xcrun xcodebuild -showBuildSettings | grep DEVELOPMENT_TEAM` on any
+// project you already sign.
+//
+// The include below is deliberately `#include?` and not `#include`: the
+// optional form is skipped when the file is absent, so a clone with no
+// `Local.xcconfig` still opens, configures, and builds for the simulator
+// instead of failing on a missing include. `Local.xcconfig` is gitignored,
+// which is the whole point -- do not add it, and do not put the team id here.
+#include? "Local.xcconfig"

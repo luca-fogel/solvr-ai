@@ -74,5 +74,56 @@ else
   echo "none"
 fi
 
+# App Store Connect rejects a marketing icon with an alpha channel, and Xcode
+# does not warn -- the failure arrives after the upload, which is the most
+# expensive moment to learn it. One sips call catches it here instead.
+note "App icon is opaque"
+icon_fail=0
+for png in solvr.ai/Assets.xcassets/AppIcon.appiconset/*.png; do
+  if sips -g hasAlpha "$png" 2>/dev/null | grep -q 'hasAlpha: yes'; then
+    echo "$(basename "$png") has an alpha channel" >&2
+    icon_fail=1
+  fi
+done
+if [ "$icon_fail" = 0 ]; then
+  echo "$(ls solvr.ai/Assets.xcassets/AppIcon.appiconset/*.png | wc -l | tr -d ' ') icons, none transparent"
+else
+  fail=1
+fi
+
+# The privacy manifest is required at submission and easy to delete by accident.
+note "Privacy manifest present and well-formed"
+if plutil -lint solvr.ai/PrivacyInfo.xcprivacy >/dev/null 2>&1; then
+  echo "PrivacyInfo.xcprivacy parses"
+else
+  echo "PrivacyInfo.xcprivacy is missing or malformed" >&2
+  fail=1
+fi
+
+# Demo mode answers every question with the same fixture. It must not be
+# reachable from a Release build -- not off by default, not reachable.
+note "No demo branch in the release path"
+python3 - <<'PY' || fail=1
+import sys
+src = open("solvr.ai/Services/ProviderFactory.swift").read().splitlines()
+depth, guarded, seen = 0, True, False
+for line in src:
+    stripped = line.strip()
+    if stripped.startswith("#if DEBUG"):
+        depth += 1
+    elif stripped.startswith("#endif") and depth:
+        depth -= 1
+    if "DemoMode.isEnabled" in line:
+        seen = True
+        if depth == 0:
+            guarded = False
+if not seen:
+    print("no demo branch at all")
+elif guarded:
+    print("demo branch is inside #if DEBUG; release resolves to the on-device model")
+else:
+    sys.exit("ProviderFactory consults demo mode outside a DEBUG guard")
+PY
+
 if [ "$fail" = 0 ]; then note "all checks passed"; else note "FAILED"; fi
 exit "$fail"

@@ -117,7 +117,7 @@ solvr.ai/
   Views/           Home · Scanner · Results (Steps/Lesson/Formulas/Videos/Chat) · History · Settings
   Utilities/       Theme, HTMLBuilder (KaTeX), PlatformHelper
   DemoMode/        fixtures, the drawn worksheet, launch-argument wiring
-Packages/SolvrCore/  the text handling that is worth testing, and its 77 tests
+Packages/SolvrCore/  the text handling that is worth testing, and its 100 tests
 ```
 
 `SolvrCore` is a local Swift package holding everything that is pure text
@@ -148,7 +148,7 @@ followed by an unescaped quote.
 ## Tests
 
 ```sh
-swift test --package-path Packages/SolvrCore    # 77 tests, ~2s, no simulator
+swift test --package-path Packages/SolvrCore    # 100 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build
 ```
@@ -267,5 +267,10 @@ Parts of the same local-AI setup:
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE). Contributions sign off with the
+GPL-3.0 — see [LICENSE](LICENSE), plus one additional permission under section 7
+allowing distribution through Apple's App Store and TestFlight, in
+[LICENSE-APPSTORE-EXCEPTION.md](LICENSE-APPSTORE-EXCEPTION.md). Without it a
+GPLv3 app is submitted under terms its own licence forbids, which is what got
+VLC removed from the store; the exception adds a permission and takes nothing
+away. Contributions sign off with the
 [DCO](CONTRIBUTING.md#sign-your-work-dco).
