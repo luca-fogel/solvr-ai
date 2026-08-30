@@ -73,15 +73,44 @@ PY
 # The app is supposed to be unable to phone home. That is a property worth
 # testing rather than asserting in a README, because it is one careless
 # URLSession away from being false.
+#
+# Scoped to what actually ships: the app target, and the SolvrCore *library* it
+# links. Not `Sources/solvr-eval`, which is a command-line measurement tool that
+# is never installed on a phone and which does contain an HTTP client -- it is
+# the only way to drive a self-hosted model, and the fine-tune comparison this
+# repository publishes cannot be reproduced without one. That arm was deleted
+# along with the hosted backend, and the deletion quietly made a published
+# result unreproducible; restoring it in the tool rather than in the library is
+# how both things stay true at once.
+#
+# So the scope is checked too, below: if a network client ever appears in the
+# library or the app, this still fails.
 note "No network client, no credential store, no vendor endpoint"
 if grep -rnE 'URLSession|api\.anthropic|cdn\.jsdelivr|img\.youtube|x-api-key|ANTHROPIC_API_KEY|SecItemAdd' \
-     --include='*.swift' solvr.ai Packages/SolvrCore/Sources \
+     --include='*.swift' solvr.ai Packages/SolvrCore/Sources/SolvrCore \
    | grep -v 'LegacyCredentialPurge.swift' \
    | grep -v '^\S*: *//' ; then
   echo "the app reaches the network or stores a credential" >&2
   fail=1
 else
-  echo "none"
+  echo "none in the app or in the library it links"
+fi
+
+# The inverse of that scope, asserted rather than assumed: the HTTP client is
+# allowed in exactly one directory, and that directory is not in the app.
+note "The network client lives only in the measurement tool"
+strays=$(grep -rnE 'URLSession' --include='*.swift' Packages/SolvrCore/Sources \
+         | grep -v '^\S*: *//' \
+         | grep -v '^Packages/SolvrCore/Sources/solvr-eval/' || true)
+if [ -n "$strays" ]; then
+  echo "a network client escaped into the shipped library:" >&2
+  echo "$strays" >&2
+  fail=1
+elif grep -q 'name: "SolvrCore".*solvr-eval' Packages/SolvrCore/Package.swift; then
+  echo "the library depends on the measurement tool" >&2
+  fail=1
+else
+  echo "only under Sources/solvr-eval/, which the app does not link"
 fi
 
 # App Store Connect rejects a marketing icon with an alpha channel, and Xcode

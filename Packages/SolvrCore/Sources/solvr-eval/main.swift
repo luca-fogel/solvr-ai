@@ -42,6 +42,11 @@ struct Options {
 
     /// Where the photographic fixtures live, for `--set camera`.
     var images = "docs/fixtures/camera"
+
+    /// `--backend local`: an OpenAI-compatible endpoint you are running.
+    var baseURL = "http://127.0.0.1:8131"
+    var model = "local"
+    var maxTokens = 2048
 }
 
 func parseOptions() -> Options {
@@ -65,6 +70,9 @@ func parseOptions() -> Options {
         case "--expect": o.expect = value()
         case "--repeat": o.repeats = max(1, Int(value()) ?? 1)
         case "--images": o.images = value()
+        case "--base-url": o.baseURL = value()
+        case "--model": o.model = value()
+        case "--max-tokens": o.maxTokens = Int(value()) ?? 2048
         case "--out": o.output = value()
         case "--help", "-h":
             print("""
@@ -89,11 +97,15 @@ func parseOptions() -> Options {
                           the pipeline even though it does not measure a model.
               on-device   Apple's on-device foundation model, via guided
                           generation -- the only backend the app ships.
+              local       an OpenAI-compatible endpoint you are running, with
+                          --base-url and --model. This is how the fine-tune is
+                          measured, and it exists in this tool only: the app has
+                          no network client and check.sh asserts it.
 
-            The hosted and self-hosted arms are gone with the backends they drove.
-            The records they produced are kept, and published, in docs/eval-records/:
-            a measurement does not stop being true because the code that made it
-            was deleted. See docs/evaluation.md for what they say.
+            The hosted arm is gone with the backend it drove. The records it
+            produced are kept, and published, in docs/eval-records/: a measurement
+            does not stop being true because the code that made it was deleted.
+            See docs/evaluation.md for what they say.
 
             Note what on-device does NOT report: input and output token counts.
             FoundationModels exposes no usage block, so those fields are null
@@ -260,8 +272,13 @@ actor MathTraces {
 /// Collects what the provider reports about each request, keyed by surface.
 actor Telemetry {
     private var fixtureCompliance: [String: LLMJSON.Compliance] = [:]
+    private var tokens: [String: (Int?, Int?)] = [:]
 
-    func record(_ surface: String, _ c: LLMJSON.Compliance) { fixtureCompliance[surface] = c }
+    func record(_ surface: String, _ c: LLMJSON.Compliance,
+                input: Int? = nil, output: Int? = nil) {
+        fixtureCompliance[surface] = c
+        tokens[surface] = (input, output)
+    }
 
     /// Compliance, input tokens, output tokens.
     ///
@@ -270,10 +287,11 @@ actor Telemetry {
     /// to repair, so there is no compliance ladder to report, and
     /// FoundationModels exposes no usage block, so there are no tokens to count.
     func take(_ surface: String) -> (LLMJSON.Compliance?, Int?, Int?) {
+        let counts = tokens.removeValue(forKey: surface) ?? (nil, nil)
         if let c = fixtureCompliance.removeValue(forKey: surface) {
-            return (c, nil, nil)
+            return (c, counts.0, counts.1)
         }
-        return (nil, nil, nil)
+        return (nil, counts.0, counts.1)
     }
 }
 
@@ -419,6 +437,27 @@ case "on-device":
     FileHandle.standardError.write(Data("this build has no FoundationModels\n".utf8))
     exit(1)
     #endif
+case "local":
+    // Not in the app, and cannot be: this target is a command-line tool that is
+    // never installed. The prompts are the ones the fine-tune was distilled
+    // against, recovered verbatim -- a model taught to answer in one shape and
+    // then asked something paraphrased is being asked a question it was not
+    // trained for.
+    guard let url = URL(string: options.baseURL) else {
+        FileHandle.standardError.write(Data("bad --base-url \(options.baseURL)\n".utf8))
+        exit(2)
+    }
+    provider = LocalServerProvider(
+        configuration: .init(baseURL: url, model: options.model,
+                             maxTokens: options.maxTokens),
+        observe: { m in
+            Task {
+                if let compliance = m.compliance {
+                    await telemetry.record(m.surface, compliance,
+                                           input: m.inputTokens, output: m.outputTokens)
+                }
+            }
+        })
 default:
     FileHandle.standardError.write(Data("unknown backend \(options.backend)\n".utf8))
     exit(2)
