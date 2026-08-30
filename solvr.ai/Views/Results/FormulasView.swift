@@ -2,21 +2,25 @@ import SwiftUI
 import SolvrCore
 
 struct FormulasView: View {
-    let formulas: [FormulaItem]?
-    let error: SolverError?
-    let isLoading: Bool
+    let state: SurfaceState<[FormulaItem]>
     var onRetry: (() -> Void)?
 
     var body: some View {
-        if isLoading {
+        switch state {
+        case .idle:
+            SurfaceIdleCard(message: "Show the formulas this needs.", onLoad: onRetry)
+        case .loading:
             loadingState
-        } else if let error {
+        case .failed(let error):
             ScrollView {
                 ErrorCard(error: error, onRetry: onRetry)
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.base)
             }
-        } else if let formulas, !formulas.isEmpty {
+        case .empty:
+            SurfaceEmptyCard(message: "The model did not return any formulas for this one.",
+                             onRetry: onRetry)
+        case .ready(let formulas):
             MathPageView(html: HTMLBuilder.buildFormulasHTML(formulas: formulas))
         }
     }

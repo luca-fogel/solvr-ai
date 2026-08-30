@@ -3,22 +3,28 @@ import SwiftData
 import SolvrCore
 
 @Observable
+@MainActor
 final class ResultsViewModel {
 
     // MARK: - Content
-    var lesson: LessonContent?
-    var steps: [StepItem]?
-    var formulas: [FormulaItem]?
-    var videos: [VideoItem]?
+    //
+    // One state per tab, rather than a value, an error and a loading flag each.
+    // Sixteen combinations described four real ones, and the combination nobody
+    // wrote a branch for -- not loading, no error, no content -- drew a blank
+    // screen in all four views.
+    var stepsState: SurfaceState<[StepItem]> = .idle
+    var lessonState: SurfaceState<LessonContent> = .idle
+    var formulasState: SurfaceState<[FormulaItem]> = .idle
+    var videosState: SurfaceState<[VideoItem]> = .idle
 
-    // MARK: - API errors
-    var lessonError: SolverError?
-    var stepsError: SolverError?
-    var formulasError: SolverError?
-    var videosError: SolverError?
+    // Read by history saving and the accessibility summary, which want the
+    // content and do not care how it got here.
+    var steps: [StepItem]? { stepsState.value }
+    var lesson: LessonContent? { lessonState.value }
+    var formulas: [FormulaItem]? { formulasState.value }
+    var videos: [VideoItem]? { videosState.value }
 
     var selectedTab: ResultTab = .steps
-    var showConfetti: Bool = false
 
     private(set) var currentProblem: String = ""
     var problemTitle: String = ""
@@ -31,18 +37,30 @@ final class ResultsViewModel {
     /// byte-identical to the original request.
     private var currentInput: ProblemInput = .text("")
 
-    // Owned here, not read off the provider. Four fetches run concurrently, and
-    // while there was exactly one backend it was harmless for them to share five
-    // booleans on a singleton. With more than one provider -- and one of them
-    // serving a single request at a time -- loading state belongs to the screen
-    // that displays it, not to whatever answered.
-    var isLoadingLesson = false
-    var isLoadingSteps = false
-    var isLoadingFormulas = false
-    var isLoadingVideos = false
+    /// Which solve the results on screen belong to.
+    ///
+    /// Backing out of a problem and solving another one used to leave the first
+    /// solve's requests in flight, still holding a reference to this view model,
+    /// still writing their answers into it when they finished. The answer for
+    /// the previous question would then appear under the new one -- which looks
+    /// exactly like a model that ignored the question. Every request carries the
+    /// id it was issued under and a stale one is dropped on arrival.
+    private var solveID = UUID()
+
+    /// The tail of the request chain.
+    ///
+    /// The on-device model serves one request at a time (`RequestQueue(maxConcurrent: 1)`
+    /// inside the provider, and `GenerationError.concurrentRequests` behind that).
+    /// Four detached `Task`s therefore did not run in parallel; they ran in
+    /// whatever order the scheduler happened to start them, which is why the
+    /// Videos tab could fill in before the Steps tab the user was staring at.
+    /// Each new request now awaits the previous one, so the order is the order
+    /// they were asked for.
+    private var tail: Task<Void, Never>?
 
     var isLoadingAny: Bool {
-        isLoadingLesson || isLoadingSteps || isLoadingFormulas || isLoadingVideos
+        stepsState.isLoading || lessonState.isLoading
+            || formulasState.isLoading || videosState.isLoading
     }
 
     // MARK: - Solve
@@ -60,17 +78,19 @@ final class ResultsViewModel {
         guard let jpeg = image.jpegData(compressionQuality: 0.8) else {
             resetState()
             let failure = SolverError.invalidResponse
-            lessonError = failure
-            stepsError = failure
-            formulasError = failure
-            videosError = failure
+            stepsState = .failed(failure)
+            lessonState = .failed(failure)
+            formulasState = .failed(failure)
+            videosState = .failed(failure)
             return
         }
         solve(.image(jpeg))
 
+        let id = solveID
         Task {
             let title = await ProviderFactory.current().title(for: .image(jpeg))
             await MainActor.run {
+                guard self.solveID == id else { return }
                 self.problemTitle = title
                 self.currentProblem = title
             }
@@ -88,94 +108,113 @@ final class ResultsViewModel {
         currentInput = input
         resetState()
 
-        // Steps first, deliberately. Against a hosted API all four run at once
-        // and the order is cosmetic. The on-device model serves one request at a
-        // time -- `GenerationError.concurrentRequests` is real -- so these queue,
-        // and steps is the tab that opens by default. Asking for it first is the
-        // difference between the screen filling in and the screen waiting.
-        Task { await fetchSteps(input) }
-        Task { await fetchLesson(input) }
-        Task { await fetchFormulas(input) }
-        Task { await fetchVideos(input) }
+        // Steps only. The other three surfaces are generated when their tab is
+        // opened -- see `ensureLoaded`. On a device that answers one request at
+        // a time, asking for four means the first answer arrives after one
+        // generation and the last after four; most students never open Videos.
+        enqueue(.steps)
     }
 
     private func resetState() {
-        lesson = nil
-        steps = nil
-        formulas = nil
-        videos = nil
-        lessonError = nil
-        stepsError = nil
-        formulasError = nil
-        videosError = nil
-        showConfetti = false
+        solveID = UUID()
+        tail?.cancel()
+        tail = nil
+        stepsState = .idle
+        lessonState = .idle
+        formulasState = .idle
+        videosState = .idle
         selectedTab = .steps
     }
 
-    // MARK: - Fetchers
+    /// Fetch a tab the first time it is looked at.
+    ///
+    /// Called from the view when the selection changes. Idempotent: a tab that
+    /// is loading, loaded or failed is left alone, so switching back and forth
+    /// does not re-ask.
+    func ensureLoaded(_ tab: ResultTab) {
+        guard !currentProblem.isEmpty else { return }
+        switch tab {
+        case .steps: if stepsState.isIdle { enqueue(.steps) }
+        case .lesson: if lessonState.isIdle { enqueue(.lesson) }
+        case .formulas: if formulasState.isIdle { enqueue(.formulas) }
+        case .videos: if videosState.isIdle { enqueue(.videos) }
+        case .chat: break   // Chat generates per message, on demand.
+        }
+    }
 
-    private func fetchLesson(_ input: ProblemInput) async {
-        isLoadingLesson = true
-        defer { isLoadingLesson = false }
+    // MARK: - The request chain
+
+    private func enqueue(_ tab: ResultTab) {
+        let input = currentInput
+        let id = solveID
+        setLoading(tab)
+
+        let previous = tail
+        tail = Task { @MainActor [weak self] in
+            // Wait for whatever was asked for first. Not cancelling it: a
+            // cancelled generation returns nothing, so cancelling to jump the
+            // queue throws away the seconds already spent on a surface the user
+            // will probably still want.
+            await previous?.value
+            guard let self, !Task.isCancelled else { return }
+            await self.fetch(tab, input: input, id: id)
+        }
+    }
+
+    private func setLoading(_ tab: ResultTab) {
+        switch tab {
+        case .steps: stepsState = .loading
+        case .lesson: lessonState = .loading
+        case .formulas: formulasState = .loading
+        case .videos: videosState = .loading
+        case .chat: break
+        }
+    }
+
+    private func fetch(_ tab: ResultTab, input: ProblemInput, id: UUID) async {
+        let provider = ProviderFactory.current()
         do {
-            let result = try await ProviderFactory.current().lesson(for: input)
-            await MainActor.run { lesson = result }
+            switch tab {
+            case .steps:
+                let result = try await provider.steps(for: input)
+                await apply(id) { $0.stepsState = result.isEmpty ? .empty : .ready(result) }
+            case .lesson:
+                let result = try await provider.lesson(for: input)
+                await apply(id) { $0.lessonState = .ready(result) }
+            case .formulas:
+                let result = try await provider.formulas(for: input)
+                await apply(id) { $0.formulasState = result.isEmpty ? .empty : .ready(result) }
+            case .videos:
+                let result = try await provider.videos(for: input)
+                await apply(id) { $0.videosState = result.isEmpty ? .empty : .ready(result) }
+            case .chat:
+                return
+            }
         } catch {
-            await MainActor.run {
-                lessonError = (error as? SolverError) ?? .apiError(error.localizedDescription)
+            let failure = (error as? SolverError) ?? .apiError(error.localizedDescription)
+            await apply(id) { model in
+                switch tab {
+                case .steps: model.stepsState = .failed(failure)
+                case .lesson: model.lessonState = .failed(failure)
+                case .formulas: model.formulasState = .failed(failure)
+                case .videos: model.videosState = .failed(failure)
+                case .chat: break
+                }
             }
         }
     }
 
-    private func fetchSteps(_ input: ProblemInput) async {
-        isLoadingSteps = true
-        defer { isLoadingSteps = false }
-        do {
-            let result = try await ProviderFactory.current().steps(for: input)
-            await MainActor.run { steps = result }
-        } catch {
-            await MainActor.run {
-                stepsError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
-    }
-
-    private func fetchFormulas(_ input: ProblemInput) async {
-        isLoadingFormulas = true
-        defer { isLoadingFormulas = false }
-        do {
-            let result = try await ProviderFactory.current().formulas(for: input)
-            await MainActor.run { formulas = result }
-        } catch {
-            await MainActor.run {
-                formulasError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
-    }
-
-    private func fetchVideos(_ input: ProblemInput) async {
-        isLoadingVideos = true
-        defer { isLoadingVideos = false }
-        do {
-            let result = try await ProviderFactory.current().videos(for: input)
-            await MainActor.run { videos = result }
-        } catch {
-            await MainActor.run {
-                videosError = (error as? SolverError) ?? .apiError(error.localizedDescription)
-            }
-        }
+    /// Write a result only if it belongs to the solve that is on screen.
+    private func apply(_ id: UUID, _ change: (ResultsViewModel) -> Void) {
+        guard solveID == id else { return }
+        change(self)
     }
 
     // MARK: - Load from History
 
     func loadFromHistory(_ problem: Problem) {
+        resetState()
         currentProblem = problem.text
-        lessonError = nil
-        stepsError = nil
-        formulasError = nil
-        videosError = nil
-        selectedTab = .steps
-        showConfetti = false
 
         // Restore source image
         if let data = problem.sourceImageData {
@@ -184,56 +223,36 @@ final class ResultsViewModel {
             sourceImage = nil
         }
 
-        // Load cached lesson
-        if let json = problem.lessonJSON, let data = json.data(using: .utf8) {
-            lesson = try? JSONDecoder().decode(LessonContent.self, from: data)
-        } else {
-            lesson = nil
-        }
+        stepsState = Self.restore([StepItem].self, from: problem.stepsJSON)
+        lessonState = Self.restore(LessonContent.self, from: problem.lessonJSON)
+        formulasState = Self.restore([FormulaItem].self, from: problem.formulasJSON)
+        videosState = Self.restore([VideoItem].self, from: problem.videosJSON)
+    }
 
-        if let json = problem.stepsJSON, let data = json.data(using: .utf8) {
-            steps = try? JSONDecoder().decode([StepItem].self, from: data)
-        } else {
-            steps = nil
-        }
-
-        if let json = problem.formulasJSON, let data = json.data(using: .utf8) {
-            formulas = try? JSONDecoder().decode([FormulaItem].self, from: data)
-        } else {
-            formulas = nil
-        }
-
-        if let json = problem.videosJSON, let data = json.data(using: .utf8) {
-            videos = try? JSONDecoder().decode([VideoItem].self, from: data)
-        } else {
-            videos = nil
-        }
+    /// A saved surface, or `idle` -- which for a history entry means the tab was
+    /// never opened when the problem was solved, and opening it now will ask.
+    private static func restore<T: Decodable & Sendable>(
+        _ type: T.Type, from json: String?
+    ) -> SurfaceState<T> {
+        guard let json, let data = json.data(using: .utf8),
+              let value = try? JSONDecoder().decode(T.self, from: data)
+        else { return .idle }
+        return .ready(value)
     }
 
     // MARK: - Retry
 
-    func retryLesson() {
-        lessonError = nil
-        lesson = nil
-        Task { await fetchLesson(currentInput) }
-    }
+    func retrySteps() { retry(.steps) }
+    func retryLesson() { retry(.lesson) }
+    func retryFormulas() { retry(.formulas) }
+    func retryVideos() { retry(.videos) }
 
-    func retrySteps() {
-        stepsError = nil
-        steps = nil
-        Task { await fetchSteps(currentInput) }
-    }
-
-    func retryFormulas() {
-        formulasError = nil
-        formulas = nil
-        Task { await fetchFormulas(currentInput) }
-    }
-
-    func retryVideos() {
-        videosError = nil
-        videos = nil
-        Task { await fetchVideos(currentInput) }
+    /// A retry is a person waiting, so it goes to the front rather than behind
+    /// whatever speculative surface is in flight.
+    private func retry(_ tab: ResultTab) {
+        tail?.cancel()
+        tail = nil
+        enqueue(tab)
     }
 
     // MARK: - Save to History

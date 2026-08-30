@@ -2,22 +2,43 @@ import SwiftUI
 import SolvrCore
 
 struct StepByStepView: View {
-    let steps: [StepItem]?
-    let error: SolverError?
-    let isLoading: Bool
+    let state: SurfaceState<[StepItem]>
     var onRetry: (() -> Void)?
 
+    // Exhaustive by construction: every state the surface can be in has a
+    // branch, and a new one will not compile until it has a branch too. The
+    // version this replaced had no `else`, so "nothing to show" showed nothing.
     var body: some View {
-        if isLoading {
+        switch state {
+        case .idle:
+            SurfaceIdleCard(message: "Not solved yet.", onLoad: onRetry)
+        case .loading:
             loadingState
-        } else if let error {
+        case .failed(let error):
             ScrollView {
                 ErrorCard(error: error, onRetry: onRetry)
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.base)
             }
-        } else if let steps, !steps.isEmpty {
-            MathPageView(html: HTMLBuilder.buildStepsHTML(steps: steps))
+        case .empty:
+            SurfaceEmptyCard(message: "The model did not return any working for this one.",
+                             onRetry: onRetry)
+        case .ready(let steps):
+            VStack(spacing: 0) {
+                MathPageView(html: HTMLBuilder.buildStepsHTML(steps: steps))
+                // Said once, quietly, on the surface that makes the claim.
+                // The model cannot check its own arithmetic and nothing in the
+                // app checks it either, so the student is told rather than left
+                // to assume.
+                Text("Worked out on this device by a small model. Check each step.")
+                    .font(Theme.Fonts.caption)
+                    .foregroundStyle(Theme.Colors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .accessibilityLabel("Worked out on this device by a small model. "
+                                        + "Check each step before relying on it.")
+            }
         }
     }
 

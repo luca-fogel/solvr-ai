@@ -2,21 +2,25 @@ import SwiftUI
 import SolvrCore
 
 struct LessonView: View {
-    let lesson: LessonContent?
-    let error: SolverError?
-    let isLoading: Bool
+    let state: SurfaceState<LessonContent>
     var onRetry: (() -> Void)?
 
     var body: some View {
-        if isLoading {
+        switch state {
+        case .idle:
+            SurfaceIdleCard(message: "Teach me this topic.", onLoad: onRetry)
+        case .loading:
             loadingState
-        } else if let error {
+        case .failed(let error):
             ScrollView {
                 ErrorCard(error: error, onRetry: onRetry)
                     .padding(.horizontal, Theme.Spacing.lg)
                     .padding(.top, Theme.Spacing.base)
             }
-        } else if let lesson {
+        case .empty:
+            SurfaceEmptyCard(message: "The model did not return a lesson for this one.",
+                             onRetry: onRetry)
+        case .ready(let lesson):
             MathPageView(html: HTMLBuilder.buildLessonHTML(lesson: lesson))
         }
     }
@@ -92,5 +96,89 @@ struct ErrorCard: View {
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity)
         .cardStyle()
+    }
+}
+
+// MARK: - The two states that used to be a blank screen
+
+/// A tab that has not been asked for yet.
+///
+/// New with lazy fetching, and the common case: the on-device model answers one
+/// request at a time, so asking for all four surfaces the moment a problem is
+/// solved makes the student wait through three generations they did not ask for.
+/// A tab is generated when it is opened -- this is what it looks like in the
+/// instant before that happens, and if the automatic fetch ever fails to fire,
+/// the button is the way out rather than an empty screen.
+struct SurfaceIdleCard: View {
+    let message: String
+    var onLoad: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.base) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 28))
+                .foregroundStyle(Theme.Colors.accent)
+
+            Text(message)
+                .font(Theme.Fonts.body)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .multilineTextAlignment(.center)
+
+            if let onLoad {
+                Button {
+                    Haptics.light()
+                    onLoad()
+                } label: {
+                    Text("Generate")
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.horizontal, Theme.Spacing.base)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(Theme.Colors.accent.opacity(0.12), in: Capsule())
+                        .foregroundStyle(Theme.Colors.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Generate this section")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(Theme.Spacing.lg)
+    }
+}
+
+/// Answered, with nothing in it. Not an error: the model returned, it just
+/// returned nothing, and saying so is better than drawing an empty page.
+struct SurfaceEmptyCard: View {
+    let message: String
+    var onRetry: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.base) {
+            Image(systemName: "tray")
+                .font(.system(size: 28))
+                .foregroundStyle(Theme.Colors.textTertiary)
+
+            Text(message)
+                .font(Theme.Fonts.body)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .multilineTextAlignment(.center)
+
+            if let onRetry {
+                Button {
+                    Haptics.light()
+                    onRetry()
+                } label: {
+                    Text("Try again")
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.horizontal, Theme.Spacing.base)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(Theme.Colors.accent.opacity(0.12), in: Capsule())
+                        .foregroundStyle(Theme.Colors.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Try this section again")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(Theme.Spacing.lg)
     }
 }

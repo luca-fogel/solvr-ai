@@ -2,9 +2,7 @@ import SwiftUI
 import SolvrCore
 
 struct VideosView: View {
-    let videos: [VideoItem]?
-    let error: SolverError?
-    let isLoading: Bool
+    let state: SurfaceState<[VideoItem]>
     var onRetry: (() -> Void)?
 
     @State private var appeared = false
@@ -13,12 +11,18 @@ struct VideosView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.base) {
-                if isLoading {
+                switch state {
+                case .idle:
+                    SurfaceIdleCard(message: "Find videos on this topic.", onLoad: onRetry)
+                case .loading:
                     loadingContent
-                } else if let error {
+                case .failed(let error):
                     ErrorCard(error: error, onRetry: onRetry)
                         .padding(.horizontal, Theme.Spacing.lg)
-                } else if let videos {
+                case .empty:
+                    SurfaceEmptyCard(message: "The model did not suggest anything to watch.",
+                                     onRetry: onRetry)
+                case .ready(let videos):
                     // Header
                     HStack {
                         Text("WATCH & LEARN")

@@ -44,6 +44,8 @@ struct ResultsView: View {
                     .padding(.bottom, Theme.Spacing.md)
             }
 
+            DemoBanner()
+
             TabSelector(
                 selectedTab: $viewModel.selectedTab,
                 tabs: contentTabs.filter { $0 != .chat }
@@ -55,7 +57,12 @@ struct ResultsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.opacity.animation(Theme.Animation.smooth))
-            .id(viewModel.selectedTab)
+            // No `.id(selectedTab)`: it tore down and rebuilt `MathPageView`'s
+            // web view on every switch, re-parsing the page and re-running
+            // KaTeX -- a visible flash for no gain.
+            .task(id: viewModel.selectedTab) {
+                viewModel.ensureLoaded(viewModel.selectedTab)
+            }
         }
     }
 
@@ -95,6 +102,8 @@ struct ResultsView: View {
 
                 // RIGHT: Tabs + content
                 VStack(spacing: 0) {
+                    DemoBanner()
+
                     TabSelector(
                         selectedTab: $viewModel.selectedTab,
                         tabs: contentTabs.filter { $0 != .chat }
@@ -106,7 +115,9 @@ struct ResultsView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity.animation(Theme.Animation.smooth))
-                    .id(viewModel.selectedTab)
+                    .task(id: viewModel.selectedTab) {
+                        viewModel.ensureLoaded(viewModel.selectedTab)
+                    }
                 }
             }
         }
@@ -173,33 +184,17 @@ struct ResultsView: View {
     private func contentForTab(_ tab: ResultTab) -> some View {
         switch tab {
         case .steps:
-            StepByStepView(
-                steps: viewModel.steps,
-                error: viewModel.stepsError,
-                isLoading: viewModel.isLoadingSteps,
-                onRetry: { viewModel.retrySteps() }
-            )
+            StepByStepView(state: viewModel.stepsState,
+                           onRetry: { viewModel.retrySteps() })
         case .lesson:
-            LessonView(
-                lesson: viewModel.lesson,
-                error: viewModel.lessonError,
-                isLoading: viewModel.isLoadingLesson,
-                onRetry: { viewModel.retryLesson() }
-            )
+            LessonView(state: viewModel.lessonState,
+                       onRetry: { viewModel.retryLesson() })
         case .formulas:
-            FormulasView(
-                formulas: viewModel.formulas,
-                error: viewModel.formulasError,
-                isLoading: viewModel.isLoadingFormulas,
-                onRetry: { viewModel.retryFormulas() }
-            )
+            FormulasView(state: viewModel.formulasState,
+                         onRetry: { viewModel.retryFormulas() })
         case .videos:
-            VideosView(
-                videos: viewModel.videos,
-                error: viewModel.videosError,
-                isLoading: viewModel.isLoadingVideos,
-                onRetry: { viewModel.retryVideos() }
-            )
+            VideosView(state: viewModel.videosState,
+                       onRetry: { viewModel.retryVideos() })
         case .chat:
             ChatView(viewModel: chatViewModel)
         }
@@ -227,6 +222,35 @@ struct ResultsView: View {
                 popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: 60, width: 0, height: 0)
             }
             topVC.present(activityVC, animated: true)
+        }
+    }
+}
+
+
+/// Says, unmissably, that the answers on screen are canned.
+///
+/// Demo mode returns the same fixture for every input, so with it on the app
+/// shows an answer to a question nobody asked -- which is exactly what a broken
+/// model looks like from the outside. It used to be invisible: a persisted
+/// toggle in Settings and no other sign. It draws nothing in Release, where
+/// demo mode does not exist.
+struct DemoBanner: View {
+    var body: some View {
+        if DemoMode.isEnabled {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("DEMO DATA — canned samples, not an answer to this problem")
+                    .font(Theme.Fonts.caption)
+                    .fontWeight(.semibold)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, Theme.Spacing.base)
+            .padding(.vertical, Theme.Spacing.sm)
+            .background(Color.orange)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Demo data. These answers are canned samples, "
+                                + "not an answer to this problem.")
         }
     }
 }
