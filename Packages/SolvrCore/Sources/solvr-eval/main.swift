@@ -39,6 +39,9 @@ struct Options {
     /// reproducible, not reliable: the point of repeating is to see whether a
     /// problem is answered the same way every time.
     var repeats = 1
+
+    /// Where the photographic fixtures live, for `--set camera`.
+    var images = "docs/fixtures/camera"
 }
 
 func parseOptions() -> Options {
@@ -61,11 +64,12 @@ func parseOptions() -> Options {
         case "--problem": o.problem = value()
         case "--expect": o.expect = value()
         case "--repeat": o.repeats = max(1, Int(value()) ?? 1)
+        case "--images": o.images = value()
         case "--out": o.output = value()
         case "--help", "-h":
             print("""
-            solvr-eval --backend <demo|on-device> [--set corpus|samples|all]
-                       [--limit N] [--repeat N] [--out file.jsonl]
+            solvr-eval --backend <demo|on-device> [--set corpus|samples|all|camera]
+                       [--limit N] [--repeat N] [--images DIR] [--out file.jsonl]
 
             Sets:
               corpus      the 43-problem corpus in problems.json (default)
@@ -73,6 +77,10 @@ func parseOptions() -> Options {
                           from SolvrCore.SampleProblems so the measured text is
                           byte-identical to the tapped text
               all         both
+              camera      photographs with known contents, read by Vision and
+                          then solved -- the only arm that measures what the
+                          camera path actually does. --images points at a
+                          directory with a manifest.json beside the pictures.
 
             Backends:
               demo        bundled fixtures. No model, no network, no spend. Still
@@ -185,6 +193,37 @@ struct Record: Encodable {
     /// Fields the app discarded because they read as a sentence, not an
     /// expression. A high count here is a missing working box on screen.
     var droppedAsProse: [String] = []
+
+    /// What `MathNotation` turned each `rawMath` string into, index-aligned with
+    /// it, empty where the field was dropped for reading as prose.
+    ///
+    /// Recording the pair rather than two independent lists is what lets the
+    /// grader answer the question that matters about the converter: did it take
+    /// a string KaTeX accepted and produce one KaTeX rejects? Three shipped bugs
+    /// say that is worth counting.
+    var convertedMath: [String] = []
+
+    /// **Exactly what the model was asked**, in full.
+    ///
+    /// New, and the reason it is new is the release this harness is measuring:
+    /// four surfaces of one photographed solve were being asked four different
+    /// things, and every published record in this repository was of a typed
+    /// problem where the question was obviously the problem. It is not obvious
+    /// on the camera path. Grouping records by `problemId` and checking that
+    /// this field is constant is now a property of a valid run.
+    var question: String?
+
+    /// `typed` or `photograph+ocr`. A number from a photograph and a number
+    /// from a typed problem are not the same measurement, and averaging them
+    /// would hide exactly the gap this arm exists to size.
+    var source: String = "typed"
+
+    /// Camera fixtures only: what a correct reading of the photograph gives.
+    var expectedText: String?
+
+    /// True on the fixture that is supposed to be refused. A photograph with
+    /// nothing legible in it must fail once, before any surface is asked.
+    var refusedAsUnreadable: Bool?
 }
 
 /// Collects the provider's per-field maths traces, keyed by surface.
@@ -194,17 +233,27 @@ struct Record: Encodable {
 /// demo arm too.
 actor MathTraces {
     private var raw: [String: [String]] = [:]
+    private var converted: [String: [String]] = [:]
     private var dropped: [String: [String]] = [:]
 
-    func record(surface: String, raw text: String, droppedAsProse: Bool) {
+    func record(surface: String, raw text: String, converted rendered: String?,
+                droppedAsProse: Bool) {
         raw[surface, default: []].append(text)
+        // Index-aligned with `raw`, empty where the field was dropped. The
+        // alignment is the point: "did our conversion break a string that
+        // rendered?" is only answerable if the before and after of the *same*
+        // string can be found, and a flat list of raw strings beside a shorter
+        // flat list of converted ones cannot answer it.
+        converted[surface, default: []].append(rendered ?? "")
         if droppedAsProse { dropped[surface, default: []].append(text) }
     }
 
-    /// Raw strings, and the ones dropped as prose. Clears as it reads, so each
-    /// request sees only its own fields.
-    func take(_ surface: String) -> ([String], [String]) {
-        (raw.removeValue(forKey: surface) ?? [], dropped.removeValue(forKey: surface) ?? [])
+    /// Raw strings, their converted forms, and the ones dropped as prose.
+    /// Clears as it reads, so each request sees only its own fields.
+    func take(_ surface: String) -> ([String], [String], [String]) {
+        (raw.removeValue(forKey: surface) ?? [],
+         converted.removeValue(forKey: surface) ?? [],
+         dropped.removeValue(forKey: surface) ?? [])
     }
 }
 
@@ -269,6 +318,43 @@ func latex(from formulas: [FormulaItem]) -> [String] {
 // MARK: - Run
 
 let options = parseOptions()
+
+/// A photograph that has been read, or the reason it could not be.
+struct ResolvedFixture {
+    let fixture: CameraFixture
+    let solve: Solve?
+    let failure: String?
+}
+
+/// Read every fixture once, before any model is asked anything.
+///
+/// This is the app's own order, and it is the point: recognition happens once,
+/// up front, and what it produced is recorded next to every surface that was
+/// asked about it. A run where the four surfaces of one photograph disagree is
+/// a failed run, not a curiosity, and `--set camera` says so at the end.
+func resolveCameraFixtures() async -> [ResolvedFixture] {
+    let (dir, fixtures) = CameraFixtures.load(from: options.images)
+    let builder = CameraFixtures.builder()
+    var out: [ResolvedFixture] = []
+    for fixture in fixtures {
+        let url = dir.appendingPathComponent(fixture.file)
+        guard let data = try? Data(contentsOf: url) else {
+            out.append(ResolvedFixture(fixture: fixture, solve: nil,
+                                       failure: "missing image \(fixture.file)"))
+            continue
+        }
+        do {
+            out.append(ResolvedFixture(fixture: fixture,
+                                       solve: try await builder.photograph(data),
+                                       failure: nil))
+        } catch {
+            out.append(ResolvedFixture(fixture: fixture, solve: nil,
+                                       failure: "\(error)"))
+        }
+    }
+    return out
+}
+
 let selected: [Problem]
 if let ad = options.problem {
     selected = [Problem(id: "adhoc", topic: "adhoc", problem: ad,
@@ -278,6 +364,7 @@ switch options.set {
 case "corpus": selected = loadProblems()
 case "samples": selected = sampleProblems()
 case "all": selected = sampleProblems() + loadProblems()
+case "camera": selected = []   // resolved below, from photographs
 default:
     FileHandle.standardError.write(Data("unknown --set \(options.set)\n".utf8))
     exit(2)
@@ -311,6 +398,7 @@ case "on-device":
     }
     let onDevice = OnDeviceProvider(traceMath: { t in
         Task { await traces.record(surface: t.surface, raw: t.raw,
+                                   converted: t.rendered,
                                    droppedAsProse: t.droppedAsProse) }
     })
     // Availability is checked once, before the run, so an ineligible machine
@@ -350,105 +438,199 @@ func emit(_ record: Record) {
     out.write(Data("\n".utf8))
 }
 
-print("backend: \(provider.identifier)")
-print("problems: \(problems.count) (\(options.set))   repeats: \(options.repeats)   "
-      + "surfaces: steps, lesson, formulas")
-print("writing:  \(options.output)")
-print("note:     requests run one at a time so latency is not distorted by queueing")
-print("")
+// MARK: - One problem, three surfaces
 
-var completed = 0
-for problem in problems {
-  for run in 1...options.repeats {
-    let question = problem.problem
+/// Everything a record needs that is not about the response.
+struct Subject {
+    let id: String
+    let topic: String
+    /// The string the model is asked. For a photograph this is what Vision read.
+    let question: String
+    let source: String
+    let expectedAnswer: String
+    let expectedNumeric: Double?
+    /// Camera fixtures only: what a correct reading would have produced.
+    let expectedText: String?
+}
+
+/// Ask one subject for the three graded surfaces, in order.
+///
+/// Every record carries `question` -- the exact string the model was given.
+/// That field is the whole reason this function exists in one copy instead of
+/// three: the bug this release is about was four surfaces being asked four
+/// different things, and a harness that could not have detected it is a harness
+/// that was measuring the wrong thing.
+func runSurfaces(_ subject: Subject, run: Int) async {
+    func record(_ surface: String, ok: Bool, latency: Double, latex: [String],
+                itemCount: Int, finalAnswer: String?, error: String?,
+                compliance: LLMJSON.Compliance?, tokens: (Int?, Int?),
+                rawMath: [String], dropped: [String], converted: [String] = []) {
+        emit(Record(backend: provider.identifier, problemId: subject.id,
+                    topic: subject.topic, surface: surface, ok: ok,
+                    latencySeconds: latency,
+                    inputTokens: tokens.0, outputTokens: tokens.1,
+                    timeToFirstTokenSeconds: nil,
+                    wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
+                    escapesRepaired: compliance?.escapesRepaired,
+                    wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
+                    latex: latex, itemCount: itemCount, finalAnswer: finalAnswer,
+                    expectedAnswer: subject.expectedAnswer,
+                    expectedNumeric: subject.expectedNumeric,
+                    error: error, runIndex: run, rawMath: rawMath,
+                    droppedAsProse: dropped, convertedMath: converted,
+                    question: subject.question, source: subject.source,
+                    expectedText: subject.expectedText))
+    }
 
     // Steps first: it is the surface the answer grading depends on.
     do {
         let clock = Date()
-        let steps = try await provider.steps(for: question)
+        let steps = try await provider.steps(for: subject.question)
         let latency = Date().timeIntervalSince(clock)
         let (tex, answer) = latexAndAnswer(from: steps)
-        let (compliance, input_, output_) = await telemetry.take("steps")
-        let (rawTex, droppedTex) = await traces.take("steps")
-        emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
-                    surface: "steps", ok: true, latencySeconds: latency,
-                    inputTokens: input_, outputTokens: output_, timeToFirstTokenSeconds: nil,
-                    wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
-                    escapesRepaired: compliance?.escapesRepaired,
-                    wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
-                    latex: tex, itemCount: steps.count, finalAnswer: answer,
-                    expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: nil, runIndex: run, rawMath: rawTex, droppedAsProse: droppedTex))
+        let (compliance, tokensIn, tokensOut) = await telemetry.take("steps")
+        let (rawTex, convertedTex, droppedTex) = await traces.take("steps")
+        record("steps", ok: true, latency: latency, latex: tex, itemCount: steps.count,
+               finalAnswer: answer, error: nil, compliance: compliance,
+               tokens: (tokensIn, tokensOut), rawMath: rawTex, dropped: droppedTex,
+               converted: convertedTex)
     } catch {
-        emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
-                    surface: "steps", ok: false, latencySeconds: 0,
-                    inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
-                    wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
-                    wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
-                    finalAnswer: nil,
-                    expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: "\(error)", runIndex: run))
+        record("steps", ok: false, latency: 0, latex: [], itemCount: 0,
+               finalAnswer: nil, error: "\(error)", compliance: nil,
+               tokens: (nil, nil), rawMath: [], dropped: [])
     }
 
     do {
         let clock = Date()
-        let lesson = try await provider.lesson(for: question)
+        let lesson = try await provider.lesson(for: subject.question)
         let latency = Date().timeIntervalSince(clock)
-        let (compliance, input_, output_) = await telemetry.take("lesson")
-        let (rawTex, droppedTex) = await traces.take("lesson")
-        emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
-                    surface: "lesson", ok: true, latencySeconds: latency,
-                    inputTokens: input_, outputTokens: output_, timeToFirstTokenSeconds: nil,
-                    wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
-                    escapesRepaired: compliance?.escapesRepaired,
-                    wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
-                    latex: latex(from: lesson), itemCount: lesson.sections.count,
-                    finalAnswer: nil,
-                    expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: nil, runIndex: run, rawMath: rawTex, droppedAsProse: droppedTex))
+        let (compliance, tokensIn, tokensOut) = await telemetry.take("lesson")
+        let (rawTex, convertedTex, droppedTex) = await traces.take("lesson")
+        record("lesson", ok: true, latency: latency, latex: latex(from: lesson),
+               itemCount: lesson.sections.count, finalAnswer: nil, error: nil,
+               compliance: compliance, tokens: (tokensIn, tokensOut),
+               rawMath: rawTex, dropped: droppedTex, converted: convertedTex)
     } catch {
-        emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
-                    surface: "lesson", ok: false, latencySeconds: 0,
-                    inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
-                    wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
-                    wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
-                    finalAnswer: nil,
-                    expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: "\(error)", runIndex: run))
+        record("lesson", ok: false, latency: 0, latex: [], itemCount: 0,
+               finalAnswer: nil, error: "\(error)", compliance: nil,
+               tokens: (nil, nil), rawMath: [], dropped: [])
     }
 
     do {
         let clock = Date()
-        let formulas = try await provider.formulas(for: question)
+        let formulas = try await provider.formulas(for: subject.question)
         let latency = Date().timeIntervalSince(clock)
-        let (compliance, input_, output_) = await telemetry.take("formulas")
-        let (rawTex, droppedTex) = await traces.take("formulas")
-        emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
-                    surface: "formulas", ok: true, latencySeconds: latency,
-                    inputTokens: input_, outputTokens: output_, timeToFirstTokenSeconds: nil,
-                    wasFenced: compliance?.wasFenced, wasSliced: compliance?.wasSliced,
-                    escapesRepaired: compliance?.escapesRepaired,
-                    wasNormalised: compliance?.wasNormalised, isClean: compliance?.isClean,
-                    latex: latex(from: formulas), itemCount: formulas.count,
-                    finalAnswer: nil,
-                    expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: nil, runIndex: run, rawMath: rawTex, droppedAsProse: droppedTex))
+        let (compliance, tokensIn, tokensOut) = await telemetry.take("formulas")
+        let (rawTex, convertedTex, droppedTex) = await traces.take("formulas")
+        record("formulas", ok: true, latency: latency, latex: latex(from: formulas),
+               itemCount: formulas.count, finalAnswer: nil, error: nil,
+               compliance: compliance, tokens: (tokensIn, tokensOut),
+               rawMath: rawTex, dropped: droppedTex, converted: convertedTex)
     } catch {
-        emit(Record(backend: provider.identifier, problemId: problem.id, topic: problem.topic,
-                    surface: "formulas", ok: false, latencySeconds: 0,
-                    inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
-                    wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
-                    wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
-                    finalAnswer: nil,
-                    expectedAnswer: problem.answer, expectedNumeric: problem.numeric,
-                    error: "\(error)", runIndex: run))
+        record("formulas", ok: false, latency: 0, latex: [], itemCount: 0,
+               finalAnswer: nil, error: "\(error)", compliance: nil,
+               tokens: (nil, nil), rawMath: [], dropped: [])
     }
-
-    completed += 1
-    FileHandle.standardError.write(
-        Data("\r\(completed)/\(problems.count * options.repeats) runs".utf8))
-  }
 }
-FileHandle.standardError.write(Data("\n".utf8))
+
+// MARK: - Run
+
+var completed = 0
+
+if options.set == "camera" {
+    let resolved = await resolveCameraFixtures()
+    print("backend: \(provider.identifier)")
+    print("fixtures: \(resolved.count) photographs from \(options.images)")
+    print("writing:  \(options.output)")
+    print("note:     each photograph is read once, before any surface is asked")
+    print("")
+
+    var misread: [String] = []
+    for item in resolved {
+        let expectUnreadable = item.fixture.expectUnreadable ?? false
+
+        guard let solve = item.solve else {
+            // A fixture that could not be read. For the one that is *meant* to
+            // be unreadable this is the pass condition; for any other it is the
+            // failure the camera path is most likely to have.
+            emit(Record(backend: provider.identifier, problemId: item.fixture.id,
+                        topic: item.fixture.topic, surface: "recognition",
+                        ok: expectUnreadable, latencySeconds: 0,
+                        inputTokens: nil, outputTokens: nil, timeToFirstTokenSeconds: nil,
+                        wasFenced: nil, wasSliced: nil, escapesRepaired: nil,
+                        wasNormalised: nil, isClean: nil, latex: [], itemCount: 0,
+                        finalAnswer: nil, expectedAnswer: item.fixture.answer,
+                        expectedNumeric: item.fixture.numeric,
+                        error: item.failure, runIndex: 1,
+                        question: nil, source: "photograph+ocr",
+                        expectedText: item.fixture.expectedText,
+                        refusedAsUnreadable: true))
+            completed += 1
+            FileHandle.standardError.write(
+                Data("\r\(completed)/\(resolved.count) fixtures".utf8))
+            continue
+        }
+
+        if expectUnreadable {
+            misread.append("\(item.fixture.id) was expected to be unreadable and was read as "
+                           + "\"\(solve.question)\"")
+        }
+
+        // The recognition itself is a record, separate from the solving. A run
+        // that cannot tell "Vision misread it" from "the model got it wrong" is
+        // not measuring the camera path, it is averaging over it.
+        emit(Record(backend: provider.identifier, problemId: item.fixture.id,
+                    topic: item.fixture.topic, surface: "recognition", ok: true,
+                    latencySeconds: 0, inputTokens: nil, outputTokens: nil,
+                    timeToFirstTokenSeconds: nil, wasFenced: nil, wasSliced: nil,
+                    escapesRepaired: nil, wasNormalised: nil, isClean: nil,
+                    latex: [], itemCount: 0, finalAnswer: nil,
+                    expectedAnswer: item.fixture.answer,
+                    expectedNumeric: item.fixture.numeric, error: nil, runIndex: 1,
+                    question: solve.question, source: solve.source.name,
+                    expectedText: item.fixture.expectedText,
+                    refusedAsUnreadable: false))
+
+        for run in 1...options.repeats {
+            await runSurfaces(Subject(id: item.fixture.id, topic: item.fixture.topic,
+                                      question: solve.question,
+                                      source: solve.source.name,
+                                      expectedAnswer: item.fixture.answer,
+                                      expectedNumeric: item.fixture.numeric,
+                                      expectedText: item.fixture.expectedText),
+                              run: run)
+        }
+        completed += 1
+        FileHandle.standardError.write(
+            Data("\r\(completed)/\(resolved.count) fixtures".utf8))
+    }
+    FileHandle.standardError.write(Data("\n".utf8))
+    for line in misread {
+        FileHandle.standardError.write(Data("WARNING: \(line)\n".utf8))
+    }
+} else {
+    print("backend: \(provider.identifier)")
+    print("problems: \(problems.count) (\(options.set))   repeats: \(options.repeats)   "
+          + "surfaces: steps, lesson, formulas")
+    print("writing:  \(options.output)")
+    print("note:     requests run one at a time so latency is not distorted by queueing")
+    print("")
+
+    for problem in problems {
+        for run in 1...options.repeats {
+            await runSurfaces(Subject(id: problem.id, topic: problem.topic,
+                                      question: problem.problem, source: "typed",
+                                      expectedAnswer: problem.answer,
+                                      expectedNumeric: problem.numeric,
+                                      expectedText: nil),
+                              run: run)
+            completed += 1
+            FileHandle.standardError.write(
+                Data("\r\(completed)/\(problems.count * options.repeats) runs".utf8))
+        }
+    }
+    FileHandle.standardError.write(Data("\n".utf8))
+}
+
 try? out.close()
 print("done. next: tools/eval/grade.sh \(options.output)")

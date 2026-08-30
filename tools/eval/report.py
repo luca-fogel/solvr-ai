@@ -41,7 +41,11 @@ def main():
         sys.stderr.write("usage: report.py <graded.jsonl> [...]\n")
         raise SystemExit(2)
 
-    records = list(load(sys.argv[1:]))
+    everything = list(load(sys.argv[1:]))
+    # A `recognition` row is what Vision read from a photograph, not a model
+    # response. Leaving it in the tables below would count reading as solving.
+    recognition = [r for r in everything if r["surface"] == "recognition"]
+    records = [r for r in everything if r["surface"] != "recognition"]
     by_backend_surface = defaultdict(list)
     for record in records:
         by_backend_surface[(record["backend"], record["surface"])].append(record)
@@ -139,6 +143,27 @@ def main():
         valid = sum(r.get("latexValid", 0) for r in rows)
         print(f"| `{backend}` | {checked} | {pct(valid, checked)} ({valid}) | {checked - valid} |")
 
+    # Only for runs whose records carry the before-and-after pair. Older records
+    # do not, and a column of zeroes computed from a field that is not there
+    # would read as a measurement rather than as its absence.
+    if any("convertedMath" in r for r in records):
+        print("\n## What the notation converter did to maths that was already valid\n")
+        print("Every maths field is recorded twice: as the model wrote it, and as")
+        print("`MathNotation` rewrote it for display. This counts the strings KaTeX")
+        print("accepted before the rewrite and rejected after it. Three shipped bugs")
+        print("-- `\\sqrt16`, `\\sine`, `\\intx` -- would all have appeared here on")
+        print("the run that introduced them.\n")
+        print("| backend | fields converted | made unrenderable |")
+        print("|---|---|---|")
+        for backend in backends:
+            rows = [r for r in records if r["backend"] == backend]
+            converted = sum(
+                sum(1 for raw, out in zip(r.get("rawMath", []), r.get("convertedMath", []))
+                    if out and out != raw)
+                for r in rows)
+            broke = sum(r.get("converterRegressions", 0) for r in rows)
+            print(f"| `{backend}` | {converted} | {broke} |")
+
     print("\n## Latency and cost\n")
     print("Requests were issued one at a time, so these are per-request latencies")
     print("rather than what a user sees when four surfaces are fetched at once.")
@@ -157,6 +182,45 @@ def main():
         cost = cost_note(backend)
         print(f"| `{backend}` | {statistics.median(latencies):.2f} | {p90:.2f} | "
               f"{tin or 'n/a'} | {tout or 'n/a'} | {cost} |")
+
+    if recognition:
+        print("\n## Reading the photograph\n")
+        print("What Vision made of each fixture, against what a correct reading")
+        print("gives. Recognition and solving are separate failures: a run that")
+        print("cannot tell \"the photo was misread\" from \"the model was wrong\" is")
+        print("averaging over the thing it was built to measure.\n")
+        exact = sum(1 for r in recognition if r.get("question") == r.get("expectedText"))
+        refused = [r for r in recognition if r.get("refusedAsUnreadable")]
+        print(f"| fixture | read exactly | what came out |")
+        print("|---|---|---|")
+        for r in sorted(recognition, key=lambda r: r["problemId"]):
+            if r.get("refusedAsUnreadable"):
+                got = "_refused: nothing legible_"
+                mark = "n/a"
+            else:
+                got = "`" + (r.get("question") or "").replace("|", "\\|") + "`"
+                mark = "yes" if r.get("question") == r.get("expectedText") else "no"
+            print(f"| `{r['problemId']}` | {mark} | {got} |")
+        readable = [r for r in recognition if not r.get("refusedAsUnreadable")]
+        print(f"\nExact readings: {exact}/{len(readable)}. "
+              f"Refused as unreadable: {len(refused)}.")
+
+        print("\n## Every surface of one solve was asked the same thing\n")
+        print("The bug this arm exists because of was four surfaces of one")
+        print("photographed solve being asked four different questions. It is now")
+        print("a property of a valid run rather than something to hope for.\n")
+        asked = defaultdict(set)
+        for r in records:
+            if r.get("question") is not None:
+                asked[r["problemId"]].add(r["question"])
+        disagreed = {k: v for k, v in asked.items() if len(v) > 1}
+        if disagreed:
+            print("| problem | questions it was asked |")
+            print("|---|---|")
+            for problem, questions in sorted(disagreed.items()):
+                print(f"| `{problem}` | {len(questions)} |")
+        else:
+            print(f"All {len(asked)} solves: one question each, across every surface.")
 
     print(f"\nRecords: {len(records)}. Problems: "
           f"{len({r['problemId'] for r in records})}.")

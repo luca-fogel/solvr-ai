@@ -107,6 +107,14 @@ struct ContentView: View {
                 if OnDeviceSelfTest.isRequested {
                     await OnDeviceSelfTest.run()
                 }
+                // `-SolvrCameraSelfTest YES` drives the camera path end to end
+                // from fixtures pushed into the container: photograph, Vision,
+                // prompt, four surfaces, and the real KaTeX render of each page.
+                // Nothing about it is compiled into the binary except the code
+                // it exercises.
+                if CameraSelfTest.isRequested {
+                    await CameraSelfTest.run()
+                }
                 // `-SolvrSolve "<problem>"` runs a real solve at launch, through
                 // whichever backend is selected. Demo mode drives the screens from
                 // fixtures, which proves the UI; this proves the whole path --

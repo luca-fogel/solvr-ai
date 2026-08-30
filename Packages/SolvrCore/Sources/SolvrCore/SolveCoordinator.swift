@@ -258,9 +258,12 @@ public final class SolveCoordinator {
 
     /// Await everything this coordinator has in flight.
     ///
-    /// Internal, for tests. The chain is a linked list of tasks each awaiting
-    /// its predecessor, so awaiting the tail awaits all of them.
-    func settle() async {
+    /// For measurement, not for the interface: the results screen is reactive
+    /// and never waits. The tests and the on-device self tests do, because
+    /// "what did every surface get asked?" is not a question you can put to a
+    /// screen that is still filling in. The chain is a linked list of tasks each
+    /// awaiting its predecessor, so awaiting the tail awaits all of them.
+    public func settle() async {
         await tail?.value
     }
 }
