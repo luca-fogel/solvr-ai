@@ -26,15 +26,25 @@ public enum MathHTML {
     /// from a photographed page, via OCR -- *ran*, in an app whose entire claim
     /// is that nothing it handles leaves the device.
     public static func escapeLaTeX(_ latex: String) -> String {
-        // Dollars first: the page wraps maths in \[ \] itself, so a stray
-        // delimiter from the model would nest and break the block.
-        var result = latex.replacingOccurrences(of: "$$", with: "")
-        result = result.replacingOccurrences(of: "$", with: "")
+        var result = stripDollarDelimiters(latex)
         // Ampersand first, or the escapes escape each other.
         result = result.replacingOccurrences(of: "&", with: "&amp;")
         result = result.replacingOccurrences(of: "<", with: "&lt;")
         result = result.replacingOccurrences(of: ">", with: "&gt;")
         return result
+    }
+
+    /// The page wraps maths in `\[ \]` itself, so a delimiter the model added
+    /// would nest and break the block.
+    ///
+    /// Separate from the HTML escaping because the evaluation harness needs
+    /// this half and not the other: it renders recorded strings through KaTeX
+    /// directly, and measuring a string the app never passes to KaTeX measures
+    /// nothing. Nine "failures" in an on-device run were `$`-delimited text that
+    /// the app strips before rendering.
+    public static func stripDollarDelimiters(_ latex: String) -> String {
+        latex.replacingOccurrences(of: "$$", with: "")
+             .replacingOccurrences(of: "$", with: "")
     }
 
     /// Convert `$…$` inline delimiters in already-escaped prose to `\(…\)`.

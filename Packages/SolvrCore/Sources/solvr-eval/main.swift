@@ -234,8 +234,17 @@ actor Telemetry {
 // can be checked by a renderer rather than by eye, and a best guess at the final
 // answer, which for a worked solution is the last step that shows any working.
 
+/// What the app actually hands KaTeX.
+///
+/// Not what the provider returned: `HTMLBuilder` strips the dollar delimiters
+/// on the way into the page, so a string measured with them in is a string the
+/// renderer never sees.
+func rendered(_ latex: [String]) -> [String] {
+    latex.map(MathHTML.stripDollarDelimiters).filter { !$0.isEmpty }
+}
+
 func latexAndAnswer(from steps: [StepItem]) -> ([String], String?) {
-    let latex = steps.compactMap { $0.math }.filter { !$0.isEmpty }
+    let latex = rendered(steps.compactMap { $0.math }.filter { !$0.isEmpty })
     // The provider marks the step carrying the answer, because the model is now
     // asked for it as its own field. Falling back to "the last step" is kept for
     // solutions that predate the field, but it is a guess and it was wrong
@@ -250,11 +259,11 @@ func latexAndAnswer(from steps: [StepItem]) -> ([String], String?) {
 }
 
 func latex(from lesson: LessonContent) -> [String] {
-    lesson.sections.compactMap { $0.formula }.filter { !$0.isEmpty }
+    rendered(lesson.sections.compactMap { $0.formula }.filter { !$0.isEmpty })
 }
 
 func latex(from formulas: [FormulaItem]) -> [String] {
-    formulas.map(\.formula).filter { !$0.isEmpty }
+    rendered(formulas.map(\.formula).filter { !$0.isEmpty })
 }
 
 // MARK: - Run

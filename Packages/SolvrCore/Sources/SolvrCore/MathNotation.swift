@@ -144,7 +144,10 @@ public enum MathNotation {
     /// Real LaTeX commands starting with `n`, longest first is not needed --
     /// the whole letter run is matched at once.
     private static let nCommands: Set<String> = [
-        "n", "ne", "neq", "neg", "nabla", "not", "nu", "ni", "nmid", "nleq",
+        // `\n` itself is deliberately absent: it is not a LaTeX command, and
+        // including it kept `\n2sin(θ) = 1` broken -- the letter run after the
+        // backslash is just "n" when a digit follows.
+        "ne", "neq", "neg", "nabla", "not", "nu", "ni", "nmid", "nleq",
         "ngeq", "newline", "nonumber", "normalsize", "natural", "nsim",
         "nparallel", "nrightarrow", "nleftarrow", "nsubseteq", "nsupseteq",
     ]
