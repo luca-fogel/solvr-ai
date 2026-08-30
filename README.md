@@ -65,6 +65,11 @@ Not a stretched phone app: on the Mac the chat sits alongside the solution
 instead of behind a tab, because there is room for it. Built and run as a Mac
 Catalyst app — `./tools/screenshot-mac.sh` builds it, runs it and captures it.
 
+**The Mac build is a development build, not a shipped one.** The release
+configuration is iPhone-only: no iPad idiom and no Catalyst. The iPad layout is
+unexercised, and shipping an idiom nobody has tested is a review finding waiting
+to happen. Debug keeps both, which is what the Mac screenshots above are.
+
 ## Try it without a key
 
 The whole results surface works with **no API key and no network**:
@@ -77,7 +82,15 @@ open solvr.ai.xcodeproj      # run on any iOS 26 simulator
 
 Then turn on **Settings → Try it without a model → Demo mode**, or launch with
 `-SolvrDemo YES`. Answers come from bundled fixtures; every problem in them is
-synthetic, written for this repository.
+synthetic, written for this repository, and while demo mode is on a banner above
+every set of results says so.
+
+**Debug builds only.** Demo mode returns the same fixture for every input, so an
+app that can be put into that state — from a toggle that persists across
+launches, with nothing on screen saying so — is an app whose answers cannot be
+told apart from a model that ignores the question. In a release build there is
+no demo branch compiled in, and `strings` on the binary finds no fixture text at
+all. `tools/check.sh` fails if that guard is ever removed.
 
 Demo mode is not a shortcut around the real code path. The fixtures are stored as
 raw JSON containing unescaped LaTeX — exactly what a model sends — and they are
@@ -99,13 +112,13 @@ credential store alive for a comparison that had already been run was the wrong
 trade for an app whose point is that it does not need one.
 
 If the on-device model cannot run — the device is not eligible, or Apple
-Intelligence is switched off — Settings says so in a sentence, and *Demo mode*
-still drives every screen from bundled fixtures.
+Intelligence is switched off — Settings says so in a sentence.
 
 ## Requirements
 
-Requirements: **Xcode 26**, **iOS 26.2** or later. No package dependencies to
-resolve — the only package is local, in `Packages/`.
+Requirements: **Xcode 26**, **iOS 26.0** or later, and an iPhone 15 Pro or newer
+for on-device answers. No package dependencies to resolve — the only package is
+local, in `Packages/`.
 
 ## How it is put together
 
@@ -150,7 +163,7 @@ followed by an unescaped quote.
 ```sh
 swift test --package-path Packages/SolvrCore    # 100 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
-xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build
+xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build  # debug only
 ```
 
 [CI](.github/workflows/ci.yml) runs the first of those on every push, asserts

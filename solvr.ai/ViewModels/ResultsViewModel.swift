@@ -215,6 +215,11 @@ final class ResultsViewModel {
     func loadFromHistory(_ problem: Problem) {
         resetState()
         currentProblem = problem.text
+        // What a tab left unsaved will be regenerated from. Without this the
+        // input is still whatever was solved last -- or empty on a cold launch
+        // into History -- and opening an unsaved tab would ask the model to
+        // solve nothing. Saved surfaces are restored below and never re-asked.
+        currentInput = .text(problem.text)
 
         // Restore source image
         if let data = problem.sourceImageData {
