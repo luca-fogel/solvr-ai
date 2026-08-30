@@ -1,16 +1,44 @@
+The camera path, end to end, on the hardware the app ships to:
+iPhone 15 Pro, iOS 26.6, Release configuration, 2026-08-30.
+
+Produced by the app itself. The fixtures are pushed into the container, so
+nothing about this test is compiled into the binary:
+
+    xcrun devicectl device copy to --device <udid> \
+      --domain-type appDataContainer --domain-identifier Lulu.solvr-ai \
+      --source docs/fixtures/camera --destination Documents/fixtures
+    xcrun devicectl device process launch --console --device <udid> \
+      Lulu.solvr-ai -- -SolvrCameraSelfTest YES
+
+Attach the console. Launched without one the app is suspended between
+generations, and a run that had taken 4.8s and 3.5s for steps and lesson took
+110s and 408s instead -- same weights, same phone, same answers. Worth knowing
+before quoting an on-device latency at anyone.
+
+Two lines are the point of the whole exercise. "asked 4 surfaces about one
+question" is requirement one, on the device. The KaTeX line is requirement two,
+measured by loading each surface's real page into a real WKWebView with the
+vendored KaTeX and `throwOnError: true` -- not by checking the strings somewhere
+else and assuming the page agreed.
+
+The third thing it says is the uncomfortable one: Vision read the integral sign
+as a bullet and dropped the exponent, so the model was asked about
+`• 3x + 2x + 4 dx` and answered that, correctly, in 4.8 seconds. On this path the
+model is rarely the problem.
+
 start — build 1, iOS 26.6
 availability: available
 fixtures: 1
 
 cam-int-01  (whiteboard-integral.jpg)
-  read in 0.73s
+  read in 0.57s
   question: • 3x + 2x + 4 dx
   expected: ∫ 3x² + 2x + 4 dx
   exact:    no
-  steps ok in 5.0s
-  lesson ok in 3.7s
-  formulas ok in 3.3s
-  videos ok in 1.6s
+  steps ok in 4.8s
+  lesson ok in 3.5s
+  formulas ok in 3.0s
+  videos ok in 1.7s
   answer:   (5/2)x^{2} + 4x + C
   correct:  x**3 + x**2 + 4*x
   asked 4 surfaces about one question: yes
