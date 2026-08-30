@@ -29,7 +29,9 @@ struct StepByStepView: View {
                 // Said once, quietly, on the surface that makes the claim.
                 // The model cannot check its own arithmetic and nothing in the
                 // app checks it either, so the student is told rather than left
-                // to assume.
+                // to assume. Not said in demo mode, where nothing was worked
+                // out on this device and the banner above says so instead.
+                if !DemoMode.isEnabled {
                 Text("Worked out on this device by a small model. Check each step.")
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.textTertiary)
@@ -38,6 +40,7 @@ struct StepByStepView: View {
                     .padding(.vertical, Theme.Spacing.sm)
                     .accessibilityLabel("Worked out on this device by a small model. "
                                         + "Check each step before relying on it.")
+                }
             }
         }
     }

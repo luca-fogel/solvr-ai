@@ -1,0 +1,29 @@
+The six topic-chip problems, run on the hardware the app ships to:
+iPhone 15 Pro, iOS 26.6, 2026-08-30.
+
+Produced by the app itself, not by the Mac harness:
+
+    xcrun devicectl device process launch --console \
+      --device <udid> Lulu.solvr-ai -- -SolvrSelfTest YES
+
+start — build 1
+availability: available
+prewarm returned in 0.00s
+sam-alg-01: 3 steps in 7.7s
+  answer: x = 2, x = 3
+  expected: x = 2 or x = 3
+sam-cal-01: 7 steps in 15.2s
+  answer: The derivative of f(x) = x^3 * sin(x) is f'(x) = x^2 * (3sin(x) + xcos(x)).
+  expected: 3*x**2*sin(x) + x**3*cos(x)
+sam-geo-01: 4 steps in 6.2s
+  answer: The area of the triangle is 30 square units.
+  expected: 30
+sam-sta-01: 4 steps in 6.7s
+  answer: 5.5
+  expected: 5.5
+sam-tri-01: 4 steps in 6.6s
+  answer: x = \pi/6, 5\pi/6
+  expected: pi/6 or 5*pi/6
+sam-lin-01: 6 steps in 9.9s
+  answer: The determinant of the matrix [3, 1] [5, 2] is 1.
+  expected: 1

@@ -44,7 +44,8 @@ public enum DemoFixtures {
         "step": 4,
         "title": "Final answer",
         "explanation": "The area under y = 3x² between x = 0 and x = 1 is exactly 1.",
-        "math": "= 1"
+        "math": "= 1",
+        "isFinalAnswer": true
       }
     ]
     """#

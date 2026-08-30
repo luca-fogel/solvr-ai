@@ -55,7 +55,7 @@ so in production these failures are silent.
 
 | backend | strings checked | render | fail |
 |---|---|---|---|
-| `apple-on-device (after)` | 132 | 100% (132) | 0 |
+| `apple-on-device (after)` | 111 | 100% (111) | 0 |
 | `apple-on-device (before)` | 111 | 76% (84) | 27 |
 
 ## Latency and cost
@@ -67,7 +67,7 @@ there is no first token to time.
 
 | backend | median s | p90 s | in tok | out tok | est. USD |
 |---|---|---|---|---|---|
-| `apple-on-device (after)` | 3.50 | 5.66 | n/a | n/a | n/a (on device) |
+| `apple-on-device (after)` | 3.68 | 6.95 | n/a | n/a | n/a (on device) |
 | `apple-on-device (before)` | 4.16 | 10.24 | n/a | n/a | n/a (on device) |
 
 Records: 108. Problems: 6.

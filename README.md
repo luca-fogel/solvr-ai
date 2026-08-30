@@ -180,16 +180,29 @@ Until this release the shipped backend had never been measured. Everything in
 [docs/evaluation-local.md](docs/evaluation-local.md) is a local Qwen3-4B, which
 is not the model on your phone.
 
-Six problems -- the ones the topic chips insert -- three runs each, graded by
-[the same harness](docs/evaluation-samples.md) that measured the fine-tune:
+Six problems -- the ones the topic chips insert -- three runs each **on a Mac**,
+graded by [the same harness](docs/evaluation-samples.md) that measured the
+fine-tune:
 
 | | requests that returned | answer correct | LaTeX that renders |
 |---|---|---|---|
 | before | 45/54 | 12/18 | 76% (84/111) |
-| after | **54/54** | **18/18** | **100% (132/132)** |
+| after | **54/54** | **18/18** | **100% (111/111)** |
 
 Three surfaces per problem — steps, lesson, formulas — so 54 requests. Median
 4.1 s each, one at a time.
+
+**And then on the phone, which disagreed.** The app can measure itself on
+hardware (`-SolvrSelfTest YES`, transcript in
+[docs/eval-records/samples/](docs/eval-records/samples/iphone-15-pro-selftest.txt)),
+and an iPhone 15 Pro got `2sin(θ) - 1 = 0` *wrong* — dividing the angle instead
+of the equation, π/12 for π/6 — where the Mac had it right, from the same model
+under the same greedy decoding. Asking for the same solutions without the
+rearrangement is right on both, so that is what the chip asks. All six are now
+correct on the phone, at 6–15 s per surface rather than the Mac's 4.
+
+Which is the finding worth keeping: a Mac is not a phone, and a number measured
+on the wrong one is a number about the wrong thing.
 
 The nine failures on the left are not the model getting the maths wrong. Three
 were a refusal — `x³ · sin(x)` trips a guardrail, `x^3 * sin(x)` does not — and

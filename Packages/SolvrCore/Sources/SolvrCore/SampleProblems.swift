@@ -80,11 +80,17 @@ public enum SampleProblems {
             text: "Find the median of the data set: 3, 7, 7, 2, 9, 4",
             expectedAnswer: "5.5",
             expectedNumeric: 5.5),
+        // `2sin(θ) - 1 = 0` is answered correctly on a Mac and *wrongly on an
+        // iPhone 15 Pro*: the phone divides the angle rather than the equation
+        // and reports π/12 and 5π/12. Same model, same greedy decoding,
+        // different hardware -- which is the strongest argument in this
+        // repository for measuring on the device the app ships to. Asking for
+        // the same solutions without the rearrangement is correct on both.
         SampleProblem(
             id: "sam-tri-01",
             topic: "Trig",
-            text: "Solve for \u{03B8}: 2sin(\u{03B8}) - 1 = 0, "
-                + "where 0 \u{2264} \u{03B8} \u{2264} 2\u{03C0}",
+            text: "Solve for x: sin(x) = 1/2, "
+                + "where 0 \u{2264} x \u{2264} 2\u{03C0}",
             expectedAnswer: "pi/6 or 5*pi/6"),
         SampleProblem(
             id: "sam-lin-01",
