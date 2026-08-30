@@ -42,24 +42,112 @@ def clean(tex: str) -> str:
     return s.strip().rstrip(".")
 
 
+# Answers arrive in three shapes the old grader could not read, and all three
+# were counted as `undecidable` -- which reads like a model failure and is not
+# one. Every one of these came out of a real on-device run:
+#
+#   "The area of the triangle is 30 square units."   answer wrapped in a sentence
+#   "x = 2 or x = 3"                                 more than one root
+#   "\theta = \pi/6, 5\pi/6"                        more than one root, comma-separated
+#
+# The rule stays what it was: never call something correct that is not. Splitting
+# and prose-extraction only ever produce *candidates*, and each candidate is still
+# compared symbolically.
+
+SPLIT = re.compile(r"\s*(?:,|;|\bor\b|\band\b)\s*", re.IGNORECASE)
+
+
+def parts(tex: str) -> list:
+    """One answer, or the several an answer may contain."""
+    pieces = [p for p in SPLIT.split(tex) if p and p.strip()]
+    return pieces if len(pieces) > 1 else [tex]
+
+
+def from_prose(text: str) -> str:
+    """The mathematics inside a sentence, if there is exactly one candidate.
+
+    Deliberately timid. It takes the last `= <value>` or the last number in the
+    sentence, and only when the sentence reads like an answer being stated. A
+    cleverer extractor would start inventing agreement.
+    """
+    tail = re.search(r"=\s*([^=]+?)\s*\.?\s*$", text)
+    if tail:
+        return tail.group(1)
+    numbers = re.findall(r"-?\d+(?:\.\d+)?(?:/\d+)?", text)
+    return numbers[-1] if numbers else ""
+
+
+# A word of three or more letters that is not a function name is a word, not a
+# product of single-letter variables. sympify will happily read "The area of the
+# triangle is 30 square units" as T*h*e*a*r*e*a*... and return an expression, so
+# "did it parse?" is not a usable test for whether a string is mathematics.
+FUNCTIONS = {"sin", "cos", "tan", "sec", "csc", "cot", "log", "ln", "exp",
+             "sqrt", "pi", "theta", "asin", "acos", "atan", "abs", "det"}
+WORD = re.compile(r"[A-Za-z]{3,}")
+
+
+def looks_like_prose(text: str) -> bool:
+    words = [w.lower() for w in WORD.findall(re.sub(r"\\[a-zA-Z]+", " ", text))]
+    return len([w for w in words if w not in FUNCTIONS]) >= 2
+
+
 def to_expr(tex: str):
     s = clean(tex)
     if not s:
         return None
-    for attempt in (s, s.replace("^", "**")):
-        try:
-            expr = parse_latex(attempt)
-        except Exception:
+    # A backslash means the model wrote LaTeX; anything else is likelier to be
+    # sympy's own syntax, where `pi` is pi. Reading "pi/6" as LaTeX gives p*i/6,
+    # which then compares unequal to the same answer written the other way.
+    latex_first = "\\" in s
+    attempts = [s, s.replace("^", "**")]
+    for attempt in attempts:
+        parsers = ([parse_latex, sympy.sympify] if latex_first
+                   else [sympy.sympify, parse_latex])
+        for parser in parsers:
             try:
-                expr = sympy.sympify(attempt)
+                expr = parser(attempt)
             except Exception:
                 continue
-        # parse_latex reads a bare `e` as a symbol, not Euler's number.
-        e = sympy.Symbol("e")
-        if e in getattr(expr, "free_symbols", set()):
-            expr = expr.subs(e, sympy.E)
-        return expr
+            # parse_latex reads constants as symbols: a bare `e` is not Euler's
+            # number and `\pi` is a symbol named pi, which then compares unequal
+            # to the same answer written as sympy's own `pi`. Two runs of the
+            # trig example were marked wrong for exactly this.
+            free = getattr(expr, "free_symbols", set())
+            for name, constant in (("e", sympy.E), ("pi", sympy.pi)):
+                symbol = sympy.Symbol(name)
+                if symbol in free:
+                    expr = expr.subs(symbol, constant)
+            return expr
     return None
+
+
+def expressions(text: str) -> list:
+    """Every expression an answer string yields, prose included."""
+    # Prose first when it reads as prose. Otherwise sympify "parses" the
+    # sentence into a product of its letters and the comparison is against
+    # nonsense rather than against the answer.
+    if looks_like_prose(text):
+        extracted = from_prose(text)
+        if extracted:
+            single = to_expr(extracted)
+            if single is not None:
+                return [single]
+    found = [e for e in (to_expr(p) for p in parts(text)) if e is not None]
+    if found:
+        return found
+    extracted = from_prose(text)
+    if extracted:
+        single = to_expr(extracted)
+        if single is not None:
+            return [single]
+    return []
+
+
+def same(a, b) -> bool:
+    try:
+        return sympy.simplify(a - b) == 0
+    except Exception:
+        return False
 
 
 def grade(record):
@@ -68,29 +156,34 @@ def grade(record):
     if not answer:
         return None, "no final answer in the response"
 
-    got = to_expr(answer)
-    if got is None:
+    got = expressions(answer)
+    if not got:
         return None, "could not parse the answer"
 
     expected_numeric = record.get("expectedNumeric")
     if expected_numeric is not None:
-        try:
-            value = complex(sympy.N(got))
+        for candidate in got:
+            try:
+                value = complex(sympy.N(candidate))
+            except Exception:
+                continue
             if abs(value.imag) > 1e-9:
-                return False, f"complex value {value}"
-            return abs(value.real - float(expected_numeric)) < 1e-6, f"{value.real} vs {expected_numeric}"
-        except Exception:
-            return None, "answer is not a number but the expected answer is"
+                continue
+            if abs(value.real - float(expected_numeric)) < 1e-6:
+                return True, f"{value.real} vs {expected_numeric}"
+        return False, f"{[str(g) for g in got]} vs {expected_numeric}"
 
-    want = to_expr(record.get("expectedAnswer", ""))
-    if want is None:
+    want = expressions(record.get("expectedAnswer", ""))
+    if not want:
         return None, "could not parse the expected answer"
-    try:
-        if sympy.simplify(got - want) == 0:
-            return True, "symbolically equal"
-        return False, f"{got} != {want}"
-    except Exception:
-        return None, "symbolic comparison failed"
+
+    # Every expected root has to appear, and the answer may not invent one. A
+    # solution that finds one of two roots is not a right answer.
+    if all(any(same(g, w) for g in got) for w in want) and len(got) >= len(want):
+        return True, "every expected value present"
+    if len(got) == 1 and len(want) == 1:
+        return False, f"{got[0]} != {want[0]}"
+    return False, f"{[str(g) for g in got]} != {[str(w) for w in want]}"
 
 
 def main():

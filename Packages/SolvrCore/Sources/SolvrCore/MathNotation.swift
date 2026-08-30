@@ -24,9 +24,16 @@ public enum MathNotation {
     /// Convert plain-text mathematics to LaTeX, or return it unchanged if it is
     /// already LaTeX or cannot be improved safely.
     public static func toLaTeX(_ raw: String) -> String {
-        guard needsConversion(raw) else { return raw }
+        // Before deciding anything else: a literal `\n` is a newline the model
+        // typed, not evidence that it was writing LaTeX. Left in place it would
+        // satisfy `needsConversion`'s "there is a backslash command here" test
+        // and the whole string would be returned untouched -- including the `\n`
+        // that KaTeX then chokes on.
+        let cleaned = literalNewlines(raw)
+        let evidence = cleaned.replacingOccurrences(of: "\\quad", with: "")
+        guard needsConversion(evidence) else { return cleaned }
 
-        var s = radicals(raw)
+        var s = radicals(cleaned)
         for (plain, latex) in symbols {
             s = s.replacingOccurrences(of: plain, with: latex)
         }
@@ -94,6 +101,54 @@ public enum MathNotation {
         ("Ω", "\\Omega"),
     ]
 
+    /// A literal `\n` the model wrote as a line separator.
+    ///
+    /// Measured: twelve of the thirty KaTeX failures in an on-device run were
+    /// `2sin(θ) - 1 = 0 \nsin(θ) = 1/2` and its like -- a backslash and an `n`,
+    /// meant as a newline, read by KaTeX as an undefined control sequence that
+    /// takes the rest of the expression down with it.
+    ///
+    /// `\quad` rather than `\\`: KaTeX itself warns that `\\` does nothing in
+    /// display mode, so it would render as a silent join. A wide space at least
+    /// shows two statements are two.
+    ///
+    /// The commands that legitimately begin `\n` are spelled out rather than
+    /// guessed at, because `x \neq y` and `\nabla f` must survive, and both have
+    /// a space before the backslash exactly like the broken case does.
+    private static func literalNewlines(_ s: String) -> String {
+        guard s.contains("\\n") else { return s }
+        var out = ""
+        var index = s.startIndex
+        while index < s.endIndex {
+            guard s[index] == "\\", s.index(after: index) < s.endIndex,
+                  s[s.index(after: index)] == "n" else {
+                out.append(s[index])
+                index = s.index(after: index)
+                continue
+            }
+            var end = s.index(after: index)
+            while end < s.endIndex, s[end].isLetter { end = s.index(after: end) }
+            let command = String(s[s.index(after: index)..<end])
+            if nCommands.contains(command) {
+                out += "\\" + command
+                index = end
+            } else {
+                // The `n` was a newline; whatever followed it is content.
+                out += " \\quad "
+                index = s.index(index, offsetBy: 2)
+            }
+        }
+        return out
+    }
+
+    /// Real LaTeX commands starting with `n`, longest first is not needed --
+    /// the whole letter run is matched at once.
+    private static let nCommands: Set<String> = [
+        "n", "ne", "neq", "neg", "nabla", "not", "nu", "ni", "nmid", "nleq",
+        "ngeq", "newline", "nonumber", "normalsize", "natural", "nsim",
+        "nparallel", "nrightarrow", "nleftarrow", "nsubseteq", "nsupseteq",
+    ]
+
     /// `√16` -> `\sqrt{16}`, `√(x+1)` -> `\sqrt{x+1}`.
     ///
     /// This one is not cosmetic. `√` used to be a plain entry in the symbol
@@ -120,8 +175,14 @@ public enum MathNotation {
             while argument < s.endIndex, s[argument] == " " {
                 argument = s.index(after: argument)
             }
-            if argument < s.endIndex, s[argument] == "(",
-               let close = matchingParen(s, from: argument) {
+            // `√[s(s-a)(s-b)(s-c)]` -- Heron's formula, exactly as the model
+            // writes it, nine times in one run. Left alone it becomes
+            // `\sqrt[...]`, where KaTeX reads the brackets as the *index* of the
+            // radical and then finds no argument at all: "unexpected end of
+            // input". Brackets and parentheses both mean "the thing under the
+            // root" here.
+            if argument < s.endIndex, s[argument] == "(" || s[argument] == "[",
+               let close = matchingGroup(s, from: argument) {
                 out += "\\sqrt{\(String(s[s.index(after: argument)..<close]))}"
                 index = s.index(after: close)
                 continue
@@ -264,11 +325,24 @@ public enum MathNotation {
     }
 
     private static func matchingParen(_ s: String, from open: String.Index) -> String.Index? {
+        matchingGroup(s, from: open)
+    }
+
+    /// The index of the delimiter closing the one at `open`, nesting included.
+    private static func matchingGroup(_ s: String, from open: String.Index) -> String.Index? {
+        let opening = s[open]
+        let closing: Character
+        switch opening {
+        case "(": closing = ")"
+        case "[": closing = "]"
+        case "{": closing = "}"
+        default: return nil
+        }
         var depth = 0
         var i = open
         while i < s.endIndex {
-            if s[i] == "(" { depth += 1 }
-            if s[i] == ")" {
+            if s[i] == opening { depth += 1 }
+            if s[i] == closing {
                 depth -= 1
                 if depth == 0 { return i }
             }

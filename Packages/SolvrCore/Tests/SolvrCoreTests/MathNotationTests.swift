@@ -171,3 +171,34 @@ struct MathNotationRegressionTests {
         }
     }
 }
+
+/// The KaTeX failures an on-device run actually produced, twenty-one of thirty
+/// of them, in two shapes.
+@Suite("What KaTeX refused to render")
+struct MathNotationRenderFailureTests {
+
+    @Test("a bracketed radical is the thing under the root, not its index")
+    func bracketedRadical() {
+        // Heron's formula, as the model writes it. `\sqrt[...]` with no
+        // argument is "unexpected end of input" and the whole expression is
+        // lost.
+        #expect(MathNotation.toLaTeX("Area = √[s(s-a)(s-b)(s-c)]")
+                == #"Area = \sqrt{s(s-a)(s-b)(s-c)}"#)
+        #expect(MathNotation.toLaTeX("√[20(20-5)]") == #"\sqrt{20(20-5)}"#)
+    }
+
+    @Test("a literal backslash-n is a line break, not a command")
+    func literalNewline() {
+        #expect(MathNotation.toLaTeX(#"a = 1 \nb = 2"#) == #"a = 1  \quad b = 2"#)
+        #expect(MathNotation.toLaTeX(#"sin(θ) = 1/2 \nθ = π/6"#).contains(#"\quad"#))
+    }
+
+    @Test("commands that really do start with n survive")
+    func realCommandsSurvive() {
+        // `x \neq y` has a space before the backslash exactly like the broken
+        // case, so the guard cannot be "preceded by whitespace".
+        for latex in [#"x \neq y"#, #"\nabla f"#, #"a \ne b"#, #"\nu = 1"#] {
+            #expect(MathNotation.toLaTeX(latex) == latex)
+        }
+    }
+}

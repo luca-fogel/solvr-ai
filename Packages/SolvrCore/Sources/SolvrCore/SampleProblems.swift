@@ -59,7 +59,9 @@ public enum SampleProblems {
             id: "sam-cal-01",
             topic: "Calculus",
             text: "Find the derivative of f(x) = x\u{00B3} \u{00B7} sin(x)",
-            expectedAnswer: "3x^2 sin(x) + x^3 cos(x)"),
+            // Written in sympy's syntax, because that is what grades it:
+            // `3x^2 sin(x)` parses as a product of the letters s, i and n.
+            expectedAnswer: "3*x**2*sin(x) + x**3*cos(x)"),
         SampleProblem(
             id: "sam-geo-01",
             topic: "Geometry",
