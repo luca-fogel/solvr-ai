@@ -18,11 +18,21 @@ let package = Package(
         .executable(name: "solvr-eval", targets: ["solvr-eval"]),
     ],
     targets: [
-        .target(name: "SolvrCore"),
+        // SOLVR_DEMO compiles in the fixture backend -- canned answers, no
+        // model, no network -- which drives the screenshot tooling and gives the
+        // evaluation harness a free arm. Debug only, and deliberately so: it
+        // returns the same answer to every question, and an app that ships the
+        // ability to do that ships the ability to be wrong in the one way a
+        // student cannot detect. In Release the fixtures are not merely
+        // unreachable, they are not in the binary.
+        .target(name: "SolvrCore",
+                swiftSettings: [.define("SOLVR_DEMO", .when(configuration: .debug))]),
         .executableTarget(
             name: "solvr-eval",
             dependencies: ["SolvrCore"],
-            resources: [.copy("problems.json")]),
-        .testTarget(name: "SolvrCoreTests", dependencies: ["SolvrCore"]),
+            resources: [.copy("problems.json")],
+            swiftSettings: [.define("SOLVR_DEMO", .when(configuration: .debug))]),
+        .testTarget(name: "SolvrCoreTests", dependencies: ["SolvrCore"],
+                    swiftSettings: [.define("SOLVR_DEMO", .when(configuration: .debug))]),
     ]
 )

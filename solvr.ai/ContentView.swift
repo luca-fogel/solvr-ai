@@ -116,7 +116,12 @@ struct ContentView: View {
 
     /// Jump straight to one screen, populated with demo data, when launched with
     /// `-SolvrDemo YES -SolvrScreen <name>`. Used by tools/screenshots.sh.
+    ///
+    /// Debug builds only. The fixtures it draws on are not compiled into a
+    /// Release binary at all, so in a shipped app this does nothing and there is
+    /// no path from a launch argument to a canned answer.
     private func openDemoScreenIfRequested() async {
+        #if DEBUG
         guard let screen = DemoMode.screen else { return }
         showSplash = false
 
@@ -140,6 +145,7 @@ struct ContentView: View {
                 chatVM.seedDemoConversation()
             }
         }
+        #endif
     }
 
     private func loadFromHistory(_ problem: Problem) {

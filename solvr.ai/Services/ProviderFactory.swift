@@ -23,9 +23,15 @@ enum ProviderFactory {
     ///   is an `@AppStorage` binding, so flipping it takes effect on the next
     ///   fetch rather than at the next launch.
     static func current() -> any SolutionProvider {
+        #if DEBUG
+        // Release has no demo arm at all -- not a flag that defaults to off, no
+        // branch. A shipped app that can be put into a state where it answers
+        // from canned samples, with nothing on screen saying so, is an app whose
+        // answers cannot be trusted to be its own.
         if DemoMode.isEnabled {
             return FixtureSolutionProvider(latency: DemoMode.simulatedLatency)
         }
+        #endif
         return sighted(onDevice)
     }
 

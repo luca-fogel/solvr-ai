@@ -1,3 +1,4 @@
+#if SOLVR_DEMO
 import Foundation
 
 /// Canned model responses for demo mode.
@@ -153,3 +154,4 @@ public enum DemoFixtures {
     ]
     """#
 }
+#endif  // SOLVR_DEMO

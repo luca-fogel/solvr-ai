@@ -1,3 +1,4 @@
+#if SOLVR_DEMO
 import Foundation
 
 /// Solvr with no key and no network, answering from bundled fixtures.
@@ -94,3 +95,4 @@ public struct FixtureSolutionProvider: SolutionProvider {
         DemoFixtures.title
     }
 }
+#endif  // SOLVR_DEMO

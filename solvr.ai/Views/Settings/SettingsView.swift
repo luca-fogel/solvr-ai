@@ -3,6 +3,15 @@ import SwiftData
 import SolvrCore
 
 struct SettingsView: View {
+
+    /// `1.0.0 (1)`, from `Info.plist`.
+    static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
@@ -42,16 +51,23 @@ struct SettingsView: View {
                     }
                 }
 
+                #if DEBUG
+                // Debug only. In Release there is no fixture provider to reach:
+                // `ProviderFactory.current()` has no demo branch compiled into
+                // it, so this toggle would toggle nothing. A switch that lies
+                // about what it does is worse than no switch.
                 Section {
                     Toggle("Demo mode", isOn: $demoMode)
                     Text("Answers come from bundled sample data instead of the "
-                         + "on-device model. Useful on a device without Apple "
-                         + "Intelligence, and every problem shown is synthetic.")
+                         + "on-device model. Every problem shown is synthetic, "
+                         + "and the results screen says so while this is on. "
+                         + "Development builds only.")
                         .font(Theme.Fonts.caption)
                         .foregroundStyle(Theme.Colors.textSecondary)
                 } header: {
                     Text("Try it without a model")
                 }
+                #endif
 
                 Section("Model") {
                     // No picker and no token slider. The system supplies the
@@ -134,7 +150,11 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("2.0.0")
+                        // Read from the bundle, not typed here. This said 2.0.0
+                        // while the project shipped 1.0 -- a number the app
+                        // asserts about itself and cannot check is a number that
+                        // drifts.
+                        Text(Self.versionString)
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
 

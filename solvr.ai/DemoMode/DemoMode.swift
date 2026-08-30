@@ -19,10 +19,25 @@ enum DemoMode {
 
     static let defaultsKey = "SolvrDemo"
 
+    /// Whether canned answers are in use.
+    ///
+    /// Always false in a Release build, and the release path in
+    /// `ProviderFactory` does not consult it at all -- two locks on the same
+    /// door, because the failure this prevents is the app confidently showing
+    /// someone else's answer to your question.
+    ///
+    /// The persisted key was the problem. It survives launches, it is flipped
+    /// from Settings, and nothing on screen said it was on -- so a toggle left
+    /// on during a demo weeks ago is indistinguishable from a model that
+    /// ignores the question.
     static var isEnabled: Bool {
+        #if DEBUG
         // UserDefaults reads `-SolvrDemo YES` from the launch arguments for free,
         // so one key covers both entry points.
         UserDefaults.standard.bool(forKey: defaultsKey)
+        #else
+        false
+        #endif
     }
 
     static func setEnabled(_ on: Bool) {

@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import SwiftData
 import SolvrCore
@@ -43,3 +44,4 @@ extension ChatViewModel {
         messages = DemoSeed.conversation
     }
 }
+#endif  // DEBUG
