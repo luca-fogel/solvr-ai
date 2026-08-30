@@ -8,7 +8,7 @@
       "answer": "x**3 + x**2 + 4*x",
       "numeric": null,
       "expectUnreadable": false,
-      "notes": "The photograph from the bug report: handwriting on a whiteboard, shot at an angle, with the edge of the board in frame. This is the crop the app itself displayed, recovered from the screenshot, so it is lower resolution than the camera produced -- a re-shot original belongs here instead. Vision reads the integral sign as a bullet."
+      "notes": "The photograph from the bug report, recovered from the phone's own history store at its stored resolution (710x480): handwriting on a whiteboard, shot at an angle, with the edge of the board in frame. This is the exact JPEG the camera path produced and saved, so it is the input the failure actually had. Vision reads the integral sign as a bullet."
     }
   ]
 }

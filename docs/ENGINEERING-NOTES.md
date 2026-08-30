@@ -155,6 +155,110 @@ The retry also stopped swallowing cancellation. `try? await Task.sleep` meant a
 user who navigated away still paid for the retry; it is `try await` now, so
 leaving the screen stops the work.
 
+## A label is not a question, and `String` cannot tell you which one it is
+
+The hardest bug in this repository to date presented as a model that had gone
+mad. A photograph of `∫ 3x² + 2x + 4 dx` produced a lesson titled *Understanding
+Scanning*, a topic line reading `SCANNING`, and five suggested videos called
+"Scanning", from Khan Academy and 3Blue1Brown. Nothing was wrong with the model.
+It was asked about the word.
+
+The app had four strings in play for one photographed solve:
+
+| string | where | what it was |
+|---|---|---|
+| `"Scanning..."` | `ContentView` | what the header said while the camera closed |
+| `"[Scanned Image]"` | the results view model | a sentinel other views compared against |
+| a model-written title | a detached task, seconds later | a *label* for the history list |
+| the text Vision read | inside a provider, per request | **the only one that was a question** |
+
+Every one of them was a `String`, so every one of them fitted wherever a problem
+was expected. Three of the four reached a prompt.
+
+The route was history. `Problem` had one text field, it held whichever label was
+current when the student backed out, and re-opening the entry set the solve's
+input to it -- so any tab that had not been generated the first time was
+generated from the label. The store on the phone this was found on has **six of
+nine rows carrying a label where the question should be**: one `"Scanning..."`,
+three `"Scanned Problem"` (the fallback when recognition failed), and two
+model-written titles. The last of those is the worst kind, because a lesson about
+"Augmented Matrix Vector Solution" is *plausible*, and nobody would photograph it
+and file a bug.
+
+Sanitising the strings would have been the obvious fix and the wrong one. What
+the code needed was for a label not to be the same *type* as a question:
+
+```swift
+struct Solve {
+    let id: UUID
+    let question: String     // the only string a prompt is ever built from
+    let source: Source       // .typed | .photograph(jpeg: Data)
+}
+```
+
+There is one initialiser, `SolveBuilder` is the only thing that calls it, and
+every prompt-taking API takes the question off it. `ProblemInput` is gone, so is
+`SightedProvider`, and so is image input on the provider protocol: after the
+builder there is no unresolved input left in the system. A display string now has
+no path into a prompt that type-checks.
+
+Two things fell out that were not the point and are worth more than they cost.
+Recognition moved *above* the four surfaces instead of below them, so a
+photograph is read once instead of five times -- the memo meant to prevent that
+had never once hit, because the app built a new wrapper per request. And a
+photograph nothing can be read from now fails on the camera screen, once, where
+taking another picture is the fix, rather than four times on a results screen the
+student has already been pushed to.
+
+## The converter is checked now, not reviewed
+
+`MathNotation` rewrites the notation Apple's on-device model writes -- it returns
+correct maths in the wrong form, `∫[0,1] 3x^2 dx`, and no amount of prompt
+wording changes that. It has also produced three separate corruption bugs:
+`\sqrt16` (the radical losing its argument), `\sine` (a function-name rule
+firing inside a word), and `\intx` (a control word with nothing terminating it).
+All three shipped. All three were found by a person looking at red text on a
+phone.
+
+The third one is instructive, because it was thirty bugs rather than one. The
+symbol table substituted Unicode operators for LaTeX commands with
+`replacingOccurrences`, and a LaTeX control word runs to the first non-letter --
+so `πr²` became `\pir^{2}`, `2πn` became `2\pin`, `Σx_i` became `\Sigmax_{i}`,
+and every entry in the table had the same fault. The quietest of them *rendered*:
+`∈f(x)` became `\inf(x)`, and `\inf` is a real command, the infimum, so the
+wrong symbol was drawn with nothing red to notice.
+
+And here is the part that decided the fix. **KaTeX renders every one of those
+Unicode characters as it stands.** `∫ x^{n} dx`, `πr^{2}`, `∑_{n=1}^{5} n`, `θ`,
+`∞`, `⋅`, `→`, `Δx`, `∂f/∂x` all parse under `throwOnError: true`. The converter
+was taking strings that rendered and producing strings that did not.
+
+A converter whose job is to improve something that already works has to be
+*checked*, and the thing that can check it is the renderer. So KaTeX is now the
+arbiter, in three places:
+
+- **`swift test`.** `KaTeXOracle` loads the app's own `katex.min.js` into a
+  `JSContext` -- `renderToString` needs no DOM -- and asserts two properties: that
+  every symbol in the table survives a letter after it, and that **no conversion
+  breaks a string that already rendered**, over the maths the model actually wrote
+  in the published records. Eight milliseconds to load the bundle, half a
+  millisecond a string. The second property found two live regressions in strings
+  from a shipped run.
+- **The page.** Display maths travels in a `data-tex` attribute on an empty
+  element and is typeset explicitly with `throwOnError: true`. When it throws, the
+  element becomes the source string in monospace with "could not be typeset --
+  shown as written" beneath it. Red text was the wrong failure mode: it reads as
+  *the maths* being wrong rather than *the rendering* having failed, and a student
+  cannot tell those apart.
+- **The harness.** Records carry each maths field twice, before and after
+  conversion, index-aligned, so `converterRegressions` is a column: how many
+  strings KaTeX accepted before we touched them and rejected after. All three
+  historical bugs would have appeared in it on the run that introduced them.
+
+The boundary bug is fixed too -- one scan, and a space after a command when a
+letter follows -- but that is no longer the thing standing between a student and
+red text.
+
 ## OCR runs before the network, and that is the point
 
 `OCRService` uses Vision's `VNRecognizeTextRequest` on device. The order matters
@@ -217,8 +321,47 @@ worked, and it was unreproducible by anyone else and broke the moment a layout
 moved. A launch argument is not clever, and it regenerates every image in the
 README with one command.
 
+## The camera path, finally measured
+
+Every published number in this repository came from typed text. The model is the
+same on both paths; what reaches it is not, and nothing recorded what Vision made
+of a photograph or checked it against anything. That is how a picture of an
+integral produced a lesson about flatbed scanners with every table still green.
+
+There are two arms now, because a Mac is not a phone and this repository has
+already been caught believing one about the other.
+
+`solvr-eval --set camera` reads photographs with their contents written down
+beside them, once each, through the same `SolveBuilder` the app uses, and then
+asks the graded surfaces about what came out. Recognition gets its own record:
+"the photo was misread" and "the model was wrong" are different failures with
+different fixes, and a run that averages over them is measuring neither.
+
+`-SolvrCameraSelfTest YES` does the same on the phone and one thing more. It
+builds the real page for each surface with the real `HTMLBuilder`, loads it into a
+real `WKWebView` with the vendored KaTeX, and reports how many strings the page
+could not typeset. A Node check can tell you a string parses; only that can tell
+you the page drew it. Fixtures are pushed into the app's container rather than
+bundled, so a Release build measures Release code with no test data compiled into
+it.
+
+The first fixture already says something the typed arm never could. Vision --
+both on a Mac and on the phone -- reads the handwritten integral sign as a bullet
+and drops the exponent, so `∫ 3x² + 2x + 4 dx` reaches the model as
+`• 3x + 2x + 4 dx`. The model then answers *that* problem, carefully, and gets it
+right for the question it was given. All four surfaces were asked the same thing
+and every display string typeset. **On this path the dominant failure is
+recognition, and it was invisible.**
+
+Which is why the app now shows the recognised text under the photograph. It is
+the only thing a student can check, and it is byte-for-byte what every tab was
+asked about.
+
 ## What is not solved
 
+- **Handwriting.** Vision reads printed problems well and handwriting unevenly,
+  and the measured case above is not a near miss -- an integral sign became a
+  bullet. Showing the student what was read is a mitigation, not a fix.
 - **No verification of the maths.** The app renders what the model says. A wrong
   step is displayed with the same confidence as a right one, and detecting that
   automatically is a genuinely hard problem, not an oversight.

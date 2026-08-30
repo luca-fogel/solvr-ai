@@ -118,6 +118,39 @@ was committed, rather than trusted from the author.
 
 43 is small. It is reported as 43 rather than padded.
 
+## Photographs, which are a different measurement
+
+`--set camera` runs a set of photographs with their contents written down beside
+them, in `docs/fixtures/camera/`. It exists because every number above this line
+is about **typed** text, and the app's front door is a camera.
+
+The model is the same on both paths. What reaches it is not: Apple's on-device
+model takes no image input at all, so a photograph becomes text first, and that
+step had never been measured or even recorded. A picture of `∫ 3x² + 2x + 4 dx`
+produced a lesson about flatbed scanners while every table in this document
+stayed green.
+
+Three things are measured that the typed arms cannot be:
+
+- **What was read.** `expectedText` in the manifest is what a *correct reading*
+  gives, not what the model should answer, so recognition and solving are graded
+  separately. They are different failures with different fixes.
+- **Whether every surface of one solve was asked the same thing.** That is now a
+  property of a valid run rather than something to hope for, because the bug this
+  arm exists because of was four surfaces being asked four different questions.
+- **What the page drew.** The device arm builds each surface's real HTML, loads
+  it into a real `WKWebView` with the vendored KaTeX, and counts the strings it
+  could not typeset. Rendering a string in Node tells you it parses; only that
+  tells you the app drew it.
+
+One fixture in the set must *fail*: a photograph with nothing legible in it has
+to produce one honest sentence before a results screen exists. A harness that
+only measured the pictures that work would not notice if that stopped being true.
+
+Results: [evaluation-camera.md](evaluation-camera.md), from
+[docs/eval-records/camera/](eval-records/camera/), including the device
+transcript.
+
 ## The comparison this is set up to run
 
 The interesting axis is not "hosted versus local". It is **constrained versus
@@ -161,6 +194,18 @@ comparison, published in full, with no data behind it. Anyone quoting Solvr as
 evidence that on-device beats hosted — or loses to it — is quoting something that
 was never measured.
 
+**The self-hosted arm was very nearly lost the same way, and for a duller
+reason.** It went out with the hosted backend, and `compare3.sh` and `arm.sh`
+carried on calling `solvr-eval --backend local` with flags that had stopped
+existing — so the three-arm comparison this repository publishes had become
+unreproducible without anything saying so. A published result whose method is no
+longer in the repository is a number with no run behind it, which is the one
+thing this project is not supposed to have. The arm is back, in the `solvr-eval`
+target only, with the prompts recovered verbatim because the LoRA was distilled
+against those exact strings. It is not in the app and cannot be: `tools/check.sh`
+asserts that the network client appears nowhere under `Sources/` except that one
+directory, and that the app and the shipped library contain none.
+
 The first local three-arm comparison was also void, and the reason is worth
 recording: a port race left all three arms talking to the same server, so all
 three "models" produced 129 byte-identical outputs. Byte-identical answers across
@@ -198,6 +243,15 @@ process.
 ## Running it
 
 ```sh
+# The camera path. Needs no key and no network; the photographs are in the repo.
+swift run --package-path Packages/SolvrCore solvr-eval \
+  --backend on-device --set camera --images docs/fixtures/camera \
+  --out eval-camera.jsonl
+tools/eval/grade.sh eval-camera.jsonl
+
+# The same on the phone, which is the only authority on the phone. See
+# docs/fixtures/camera/README.md for the three devicectl lines.
+
 # Free: no key, no network, no spend. Validates the whole pipeline.
 cd Packages/SolvrCore && swift run solvr-eval --backend demo --out ../../eval-demo.jsonl
 

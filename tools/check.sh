@@ -60,6 +60,37 @@ else
   fail=1
 fi
 
+# Same rule again for the camera arm, which lives in its own subdirectory so the
+# corpus totals asserted below stay what they were.
+note "docs/evaluation-camera.md regenerates from docs/eval-records/camera/"
+if python3 tools/eval/report.py docs/eval-records/camera/*.graded.jsonl \
+   | diff - docs/evaluation-camera.md; then
+  echo "identical"
+else
+  fail=1
+fi
+
+# A camera fixture without ground truth beside it is a picture, not a
+# measurement, and a manifest entry without its picture is a run that silently
+# skips.
+note "Every camera fixture has a manifest entry and vice versa"
+python3 - <<'PY2' || fail=1
+import json, pathlib
+root = pathlib.Path("docs/fixtures/camera")
+manifest = json.loads((root / "manifest.json").read_text())["fixtures"]
+declared = {f["file"] for f in manifest}
+present = {p.name for p in root.iterdir()
+           if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".heic"}}
+missing = declared - present
+extra = present - declared
+assert not missing, f"manifest names images that are not here: {sorted(missing)}"
+assert not extra, f"images with no manifest entry: {sorted(extra)}"
+for f in manifest:
+    assert f.get("expectedText"), f"{f['id']} has no expectedText"
+    assert f.get("answer") or f.get("expectUnreadable"), f"{f['id']} has no answer"
+print(f"{len(manifest)} fixtures, each with an image and ground truth")
+PY2
+
 note "Every record is parseable and accounted for"
 python3 - <<'PY' || fail=1
 import glob, json

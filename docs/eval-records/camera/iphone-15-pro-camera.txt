@@ -1,0 +1,22 @@
+start — build 1, iOS 26.6
+availability: available
+fixtures: 1
+
+cam-int-01  (whiteboard-integral.jpg)
+  read in 0.73s
+  question: • 3x + 2x + 4 dx
+  expected: ∫ 3x² + 2x + 4 dx
+  exact:    no
+  steps ok in 5.0s
+  lesson ok in 3.7s
+  formulas ok in 3.3s
+  videos ok in 1.6s
+  answer:   (5/2)x^{2} + 4x + C
+  correct:  x**3 + x**2 + 4*x
+  asked 4 surfaces about one question: yes
+  render steps: 5/5 typeset
+  render lesson: 0/0 typeset
+  render formulas: 5/5 typeset
+
+KaTeX: 10/10 display strings typeset under throwOnError: true, on this device, in the app's own web view
+end
