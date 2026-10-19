@@ -64,6 +64,7 @@ struct ContentView: View {
                                let problem = resultsVM.saveProblem(context: modelContext) {
                                 chatVM.saveMessages(to: problem)
                             } else if let historyProblem = currentHistoryProblem {
+                                resultsVM.writeBackSurfaces(to: historyProblem)
                                 chatVM.saveMessages(to: historyProblem)
                             }
                             isFromHistory = false

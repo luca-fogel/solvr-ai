@@ -1,6 +1,6 @@
 # solvr.ai
 
-[![CI](https://github.com/foggylulu/solvr-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/foggylulu/solvr-ai/actions/workflows/ci.yml)
+[![CI](https://github.com/luca-fogel/solvr-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/luca-fogel/solvr-ai/actions/workflows/ci.yml)
 
 Photograph a maths problem. Get the working, and the lesson behind it.
 
@@ -80,7 +80,7 @@ to happen. Debug keeps both, which is what the Mac screenshots above are.
 The whole results surface works with **no API key and no network**:
 
 ```sh
-git clone https://github.com/foggylulu/solvr-ai.git
+git clone https://github.com/luca-fogel/solvr-ai.git
 cd solvr-ai
 open solvr.ai.xcodeproj      # run on any iOS 26 simulator
 ```
@@ -407,12 +407,12 @@ rebuilds them from the config.
 
 Parts of the same local-AI setup:
 
-- [**mac-ai-activity**](https://github.com/foggylulu/mac-ai-activity) — what a
+- [**mac-ai-activity**](https://github.com/luca-fogel/mac-ai-activity) — what a
   local generation costs: joules per token, per-slot llama.cpp telemetry, die
   temperatures.
-- [**llmctl**](https://github.com/foggylulu/llmctl) — which local models are
+- [**llmctl**](https://github.com/luca-fogel/llmctl) — which local models are
   holding RAM, and one command to get it back.
-- [**wake-on-llm**](https://github.com/foggylulu/wake-on-llm) — turning a big
+- [**wake-on-llm**](https://github.com/luca-fogel/wake-on-llm) — turning a big
   local model on from a phone, anywhere, over Tailscale.
 
 ## License

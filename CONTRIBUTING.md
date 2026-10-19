@@ -25,12 +25,9 @@ key. Please keep it working; it is what makes this repo reviewable by a stranger
   correct that looks.
 - **`nil` beats a plausible half-answer.** Truncated or wrongly shaped responses
   return nothing, so the caller can fall back to showing the model's own words.
-- **Nothing leaves the device that does not have to.** OCR runs before the
-  network on purpose. If you add a request, ask whether it needs the image or
-  just the text.
-- **Secrets live in the Keychain, and nowhere else.** There is no plaintext
-  fallback, deliberately; a failure to store a credential securely has to be a
-  visible failure.
+- **Nothing leaves the device.** No `URLSession` / credential store in
+  `solvr.ai` or `Packages/SolvrCore/Sources/SolvrCore` — `tools/check.sh` enforces
+  this. HTTP belongs only under `Sources/solvr-eval/` for measurement.
 - **Fixtures and examples are synthetic.** No real student work, no names, no
   tutoring records, in any file, ever.
 

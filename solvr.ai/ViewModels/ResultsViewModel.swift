@@ -106,6 +106,23 @@ final class ResultsViewModel {
         context.insert(problem)
         return problem
     }
+
+    /// Persists regenerated surfaces onto an existing history row when the user
+    /// leaves the results screen. Chat messages are saved separately.
+    func writeBackSurfaces(to problem: Problem) {
+        if let steps {
+            problem.stepsJSON = try? String(data: JSONEncoder().encode(steps), encoding: .utf8)
+        }
+        if let lesson {
+            problem.lessonJSON = try? String(data: JSONEncoder().encode(lesson), encoding: .utf8)
+        }
+        if let formulas {
+            problem.formulasJSON = try? String(data: JSONEncoder().encode(formulas), encoding: .utf8)
+        }
+        if let videos {
+            problem.videosJSON = try? String(data: JSONEncoder().encode(videos), encoding: .utf8)
+        }
+    }
 }
 
 // MARK: - Result Tab
