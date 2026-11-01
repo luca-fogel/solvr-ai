@@ -206,6 +206,7 @@ enum HTMLBuilder {
                         {left: '\\\\(', right: '\\\\)', display: false}
                     ],
                     throwOnError: true,
+                    trust: false, maxExpand: 1000, maxSize: 20,
                     // auto-render already puts the original text back when a
                     // parse throws; this is only how we get to hear about it.
                     errorCallback: function (message, error) {
@@ -223,7 +224,8 @@ enum HTMLBuilder {
                     var tex = element.getAttribute('data-tex');
                     try {
                         katex.render(tex, element, {
-                            throwOnError: true, displayMode: true
+                            throwOnError: true, displayMode: true,
+                            trust: false, maxExpand: 1000, maxSize: 20
                         });
                     } catch (e) {
                         element.classList.add('untypeset');

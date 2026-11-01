@@ -61,9 +61,9 @@ learns to answer tersely would look like an improvement.
 
 ## LaTeX that renders
 
-Rendered with KaTeX 0.16.21 -- the version the app loads -- and
-`throwOnError: true`. The app itself renders with `throwOnError: false`,
-so in production these failures are silent.
+Rendered with KaTeX 0.16.21 and `throwOnError: true`.
+These versions describe the recorded runs; historical records have not
+been re-rendered with the app's current dependency.
 
 | backend | strings checked | render | fail |
 |---|---|---|---|

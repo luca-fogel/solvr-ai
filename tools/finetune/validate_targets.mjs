@@ -51,7 +51,7 @@ for await (const line of rl) {
   for (const tex of strings) {
     if (!tex) continue;
     checked++;
-    try { katex.renderToString(tex, { throwOnError: true, displayMode: true }); }
+    try { katex.renderToString(tex, { throwOnError: true, displayMode: true, trust: false, maxExpand: 1000, maxSize: 20 }); }
     catch (e) { failed++; errors.push(`${tex} :: ${String(e.message).slice(0, 90)}`); }
   }
   if (errors.length) {

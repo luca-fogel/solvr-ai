@@ -1,0 +1,6 @@
+{
+  "name": "solvr-evaluation-tools",
+  "private": true,
+  "scripts": { "test": "node --test eval/test_katex.cjs" },
+  "dependencies": { "katex": "0.18.2" }
+}

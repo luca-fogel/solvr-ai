@@ -17,7 +17,7 @@
 // introduced them.
 //
 // KaTeX comes from the app's own bundle rather than from node_modules. The npm
-// copy is pinned to 0.16.21 and so is the vendored one, but "pinned to the same
+// copy is pinned to 0.18.2 and so is the vendored one, but "pinned to the same
 // version" is not the same claim as "the same file", and the point of this
 // script is to render what the app renders.
 //
@@ -52,7 +52,7 @@ if (!input) {
 
 function renders(tex) {
   try {
-    katex.renderToString(tex, { throwOnError: true, displayMode: true });
+    katex.renderToString(tex, { throwOnError: true, displayMode: true, trust: false, maxExpand: 1000, maxSize: 20 });
     return true;
   } catch (e) {
     return String(e.message);
@@ -78,6 +78,7 @@ for await (const line of rl) {
     }
   }
   record.latexChecked = (record.latex ?? []).length;
+  record.latexVersion = katex.version;
   record.latexValid = valid;
   record.latexErrors = errors;
 

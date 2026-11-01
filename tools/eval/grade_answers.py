@@ -16,6 +16,7 @@ hand-checked -- rather than a guess.
 
 Usage: grade_answers.py in.jsonl > out.jsonl
 """
+import ast
 import json
 import re
 import sys
@@ -26,19 +27,70 @@ warnings.filterwarnings("ignore")
 import sympy
 from sympy.parsing.latex import parse_latex
 
+MAX_EXPRESSION_LENGTH = 2048
+MAX_EXPRESSION_NODES = 256
+
+
+def arithmetic_expression(text):
+    """Build symbolic arithmetic from an allowlisted AST; never evaluate Python."""
+    tree = ast.parse(text.replace("^", "**"), mode="eval")
+    if sum(1 for _ in ast.walk(tree)) > MAX_EXPRESSION_NODES:
+        raise ValueError("expression is too complex")
+    functions = {name: getattr(sympy, name) for name in
+                 ("sin", "cos", "tan", "sec", "csc", "cot", "log", "exp",
+                  "sqrt", "asin", "acos", "atan")}
+    functions.update(ln=sympy.log, abs=sympy.Abs)
+    constants = {"pi": sympy.pi, "e": sympy.E, "E": sympy.E}
+
+    def convert(node, depth=0):
+        if depth > 32:
+            raise ValueError("expression is too deep")
+        child = lambda n: convert(n, depth + 1)
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            literal = ast.get_source_segment(text.replace("^", "**"), node)
+            if len(literal) > 100:
+                raise ValueError("number is too large")
+            return sympy.Integer(node.value) if type(node.value) is int else sympy.Float(literal)
+        if isinstance(node, ast.Name) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,31}", node.id):
+            return constants.get(node.id, sympy.Symbol(node.id))
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            value = child(node.operand)
+            return value if isinstance(node.op, ast.UAdd) else -value
+        if isinstance(node, ast.BinOp):
+            left, right = child(node.left), child(node.right)
+            if isinstance(node.op, ast.Add): return sympy.Add(left, right, evaluate=False)
+            if isinstance(node.op, ast.Sub): return sympy.Add(left, -right, evaluate=False)
+            if isinstance(node.op, ast.Mult): return sympy.Mul(left, right, evaluate=False)
+            if isinstance(node.op, ast.Div): return sympy.Mul(left, sympy.Pow(right, -1, evaluate=False), evaluate=False)
+            if isinstance(node.op, ast.Pow):
+                # Avoid evaluating towers or unbounded numeric exponents.
+                if isinstance(node.right, ast.BinOp):
+                    raise ValueError("compound powers are unsupported")
+                if right.is_number and abs(right) > 1000:
+                    raise ValueError("power is too large")
+                return sympy.Pow(left, right, evaluate=False)
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id in functions and not node.keywords and len(node.args) == 1):
+            return functions[node.func.id](child(node.args[0]), evaluate=False)
+        raise ValueError("unsupported arithmetic syntax")
+
+    return convert(tree.body)
+
 
 def clean(tex: str) -> str:
     """Strip the presentation and keep the mathematics."""
     s = tex.strip()
-    s = re.sub(r"^\$+|\$+$", "", s)
-    s = re.sub(r"^\\\(|\\\)$", "", s)
+    s = s.strip("$")
+    s = s.removeprefix(r"\(").removesuffix(r"\)")
     s = re.sub(r"\\(left|right)\b", "", s)
     s = re.sub(r"\\[,;!qquad]+", " ", s)
-    s = re.sub(r"\\text\{[^}]*\}", "", s)
-    s = re.sub(r"\\boxed\{(.*)\}", r"\1", s)
+    s = re.sub(r"\\text\{[^{}]*\}", "", s)
     # A final line is often written as "= 1" or "x = 1"; the answer is the tail.
     if "=" in s:
         s = s.split("=")[-1]
+    s = s.strip()
+    if s.startswith(r"\boxed{") and s.endswith("}"):
+        s = s[len(r"\boxed{"):-1]
     return s.strip().rstrip(".")
 
 
@@ -54,12 +106,12 @@ def clean(tex: str) -> str:
 # and prose-extraction only ever produce *candidates*, and each candidate is still
 # compared symbolically.
 
-SPLIT = re.compile(r"\s*(?:,|;|\bor\b|\band\b)\s*", re.IGNORECASE)
+SPLIT = re.compile(r"[,;]|\bor\b|\band\b", re.IGNORECASE)
 
 
 def parts(tex: str) -> list:
     """One answer, or the several an answer may contain."""
-    pieces = [p for p in SPLIT.split(tex) if p and p.strip()]
+    pieces = [p.strip() for p in SPLIT.split(tex) if p.strip()]
     return pieces if len(pieces) > 1 else [tex]
 
 
@@ -70,9 +122,9 @@ def from_prose(text: str) -> str:
     sentence, and only when the sentence reads like an answer being stated. A
     cleverer extractor would start inventing agreement.
     """
-    tail = re.search(r"=\s*([^=]+?)\s*\.?\s*$", text)
-    if tail:
-        return tail.group(1)
+    _, separator, tail = text.rpartition("=")
+    if separator and tail.strip():
+        return tail.strip().removesuffix(".").rstrip()
     numbers = re.findall(r"-?\d+(?:\.\d+)?(?:/\d+)?", text)
     return numbers[-1] if numbers else ""
 
@@ -92,6 +144,8 @@ def looks_like_prose(text: str) -> bool:
 
 
 def to_expr(tex: str):
+    if not isinstance(tex, str) or len(tex) > MAX_EXPRESSION_LENGTH:
+        return None
     s = clean(tex)
     if not s:
         return None
@@ -99,26 +153,28 @@ def to_expr(tex: str):
     # sympy's own syntax, where `pi` is pi. Reading "pi/6" as LaTeX gives p*i/6,
     # which then compares unequal to the same answer written the other way.
     latex_first = "\\" in s
-    attempts = [s, s.replace("^", "**")]
-    for attempt in attempts:
-        parsers = ([parse_latex, sympy.sympify] if latex_first
-                   else [sympy.sympify, parse_latex])
-        for parser in parsers:
+    try:
+        if latex_first:
+            expr = parse_latex(s, strict=True)
+        else:
             try:
-                expr = parser(attempt)
-            except Exception:
-                continue
-            # parse_latex reads constants as symbols: a bare `e` is not Euler's
-            # number and `\pi` is a symbol named pi, which then compares unequal
-            # to the same answer written as sympy's own `pi`. Two runs of the
-            # trig example were marked wrong for exactly this.
-            free = getattr(expr, "free_symbols", set())
-            for name, constant in (("e", sympy.E), ("pi", sympy.pi)):
-                symbol = sympy.Symbol(name)
-                if symbol in free:
-                    expr = expr.subs(symbol, constant)
-            return expr
-    return None
+                expr = arithmetic_expression(s)
+            except SyntaxError:
+                # Preserve implicit multiplication such as 2x. The LaTeX parser
+                # constructs symbolic objects; it does not evaluate Python.
+                expr = parse_latex(s, strict=True)
+        if sum(1 for _ in sympy.preorder_traversal(expr)) > MAX_EXPRESSION_NODES:
+            return None
+        # parse_latex reads constants as symbols: normalize e and pi so they
+        # compare equally to the same constants in arithmetic notation.
+        free = getattr(expr, "free_symbols", set())
+        for name, constant in (("e", sympy.E), ("pi", sympy.pi)):
+            symbol = sympy.Symbol(name)
+            if symbol in free:
+                expr = expr.subs(symbol, constant)
+        return expr
+    except Exception:
+        return None
 
 
 def expressions(text: str) -> list:
@@ -126,6 +182,8 @@ def expressions(text: str) -> list:
     # Prose first when it reads as prose. Otherwise sympify "parses" the
     # sentence into a product of its letters and the comparison is against
     # nonsense rather than against the answer.
+    if not isinstance(text, str) or len(text) > MAX_EXPRESSION_LENGTH:
+        return []
     if looks_like_prose(text):
         extracted = from_prose(text)
         if extracted:

@@ -76,11 +76,11 @@ Where the grader cannot decide it returns `undecidable`, not a guess. **There is
 no LLM judge.** A model grading output from its own family agrees with itself for
 reasons unrelated to correctness.
 
-**LaTeX that renders** — every LaTeX string is rendered with KaTeX 0.16.21, the
-version the app loads, with `throwOnError: true`, and the failures counted. The
-app renders with `throwOnError: false`, which is correct for shipping — one bad
-formula should not blank the screen — but it means that in production, invalid
-LaTeX fails *silently*. This is the only place it is visible.
+**LaTeX that renders** — every LaTeX string is rendered with the app's vendored
+KaTeX, with `throwOnError: true`, and the failures counted. New records include
+the renderer version. Historical published runs used 0.16.21; those results
+have not been changed by the upgrade to 0.18.2. The app now catches rendering
+errors and shows a fallback rather than silently accepting invalid LaTeX.
 
 **Latency** — wall clock per request, with requests issued one at a time so
 queueing does not contaminate the number.
@@ -268,9 +268,15 @@ One-time setup for the graders:
 
 ```sh
 python3 -m venv ~/.venvs/solvr-eval
-~/.venvs/solvr-eval/bin/pip install sympy 'antlr4-python3-runtime==4.11'
-(cd tools/eval && npm install katex@0.16.21)
+~/.venvs/solvr-eval/bin/pip install -r tools/eval/requirements.txt
+# Node.js is required; grading loads KaTeX directly from the app bundle.
 ```
+
+KaTeX updates are tracked in `tools/package.json` and its lockfile. After
+accepting a dependency update, run `(cd tools && npm ci --ignore-scripts &&
+node vendor_katex.cjs && npm test)` and commit the regenerated app assets.
+The regression suite checks the bundle version and hashes, so a manifest-only
+update cannot silently leave the shipped renderer vulnerable.
 
 `--limit N` runs a prefix of the set, which is the sane way to check a paid arm
 works before committing to all of it.

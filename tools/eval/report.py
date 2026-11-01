@@ -132,9 +132,10 @@ def main():
         print(f"| `{backend}` | {cells[0]} | {cells[1]} | {cells[2]} | {cells[3]} |")
 
     print("\n## LaTeX that renders\n")
-    print("Rendered with KaTeX 0.16.21 -- the version the app loads -- and")
-    print("`throwOnError: true`. The app itself renders with `throwOnError: false`,")
-    print("so in production these failures are silent.\n")
+    versions = sorted({r.get("latexVersion", "0.16.21") for r in records})
+    print(f"Rendered with KaTeX {', '.join(versions)} and `throwOnError: true`.")
+    print("These versions describe the recorded runs; historical records have not")
+    print("been re-rendered with the app's current dependency.\n")
     print("| backend | strings checked | render | fail |")
     print("|---|---|---|---|")
     for backend in backends:
