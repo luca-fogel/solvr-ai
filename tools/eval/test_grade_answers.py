@@ -41,6 +41,14 @@ class GradingSecurityTests(unittest.TestCase):
         self.assertIsNone(grader.to_expr('10**10**10'))
         self.assertEqual(grader.expressions(None), [])
 
+    def test_implicit_products_preserve_math_precedence(self):
+        for answer, expected in [('(x - 2)(x - 3)', 'x^2 - 5*x + 6'),
+                                 ('e^x (x + 1)', 'exp(x)*(x+1)'),
+                                 ('(1)(4) - (2)(3)', '-2'),
+                                 (r'x = \boxed{2}', '2')]:
+            with self.subTest(answer=answer):
+                self.assertTrue(grader.grade({'finalAnswer': answer, 'expectedAnswer': expected})[0])
+
 
 if __name__ == '__main__':
     unittest.main()

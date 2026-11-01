@@ -17,9 +17,11 @@ hand-checked -- rather than a guess.
 Usage: grade_answers.py in.jsonl > out.jsonl
 """
 import ast
+import io
 import json
 import re
 import sys
+import tokenize
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -33,7 +35,24 @@ MAX_EXPRESSION_NODES = 256
 
 def arithmetic_expression(text):
     """Build symbolic arithmetic from an allowlisted AST; never evaluate Python."""
-    tree = ast.parse(text.replace("^", "**"), mode="eval")
+    # Parenthesis juxtaposition means multiplication in model math: (x-2)(x-3)
+    # and e^x (x+1). Rewrite tokens before parsing, rather than letting Python's
+    # call precedence reinterpret the latter as e**(x*(x+1)). Function calls
+    # remain restricted to the allowlist below.
+    tokens = []
+    previous = None
+    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+        if token.string == "(" and previous is not None:
+            kind, value = previous
+            variable = kind == tokenize.NAME and (value in {"pi", "E"} or
+                       (len(value) == 1 and value.isalpha()))
+            if kind == tokenize.NUMBER or value == ")" or variable:
+                tokens.append((tokenize.OP, "*"))
+        tokens.append((token.type, token.string))
+        if token.type not in {tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}:
+            previous = (token.type, token.string)
+    source = tokenize.untokenize(tokens).replace("^", "**")
+    tree = ast.parse(source, mode="eval")
     if sum(1 for _ in ast.walk(tree)) > MAX_EXPRESSION_NODES:
         raise ValueError("expression is too complex")
     functions = {name: getattr(sympy, name) for name in
@@ -47,7 +66,7 @@ def arithmetic_expression(text):
             raise ValueError("expression is too deep")
         child = lambda n: convert(n, depth + 1)
         if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-            literal = ast.get_source_segment(text.replace("^", "**"), node)
+            literal = ast.get_source_segment(source, node)
             if len(literal) > 100:
                 raise ValueError("number is too large")
             return sympy.Integer(node.value) if type(node.value) is int else sympy.Float(literal)
