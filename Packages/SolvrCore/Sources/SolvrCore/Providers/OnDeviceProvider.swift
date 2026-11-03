@@ -252,8 +252,27 @@ public final class OnDeviceProvider: SolutionProvider {
         // step that shows any working", which is a guess that is wrong exactly
         // when the solution was cut short -- the case where being wrong matters.
         let answer = renderMath(solution.finalAnswer, surface: "steps")
-        if let math = answer.math, !math.isEmpty {
-            if items.last?.math == math {
+        return Self.attachingFinalAnswer(to: items, math: answer.math, prose: answer.prose)
+    }
+
+    /// Mark the conclusion, adding a "Final answer" step only when the working
+    /// does not already end on it.
+    ///
+    /// Pure so it can be tested without a model. The comparison ignores spacing
+    /// because the model restates its last line with different spacing --
+    /// `(x, y) = (7, 3)` after `(x,y) = (7,3)` -- and a word answer counts as
+    /// already given when the last step says the same sentence. Both showed up
+    /// on screen as the answer printed twice in a row.
+    static func attachingFinalAnswer(to steps: [StepItem], math: String?,
+                                     prose: String?) -> [StepItem] {
+        var items = steps
+        func same(_ a: String?, _ b: String?) -> Bool {
+            guard let a, let b else { return false }
+            let squash = { (s: String) in s.filter { !$0.isWhitespace }.lowercased() }
+            return !squash(a).isEmpty && squash(a) == squash(b)
+        }
+        if let math, !math.isEmpty {
+            if same(items.last?.math, math) {
                 items[items.count - 1].isFinalAnswer = true
             } else {
                 items.append(StepItem(step: items.count + 1,
@@ -262,16 +281,20 @@ public final class OnDeviceProvider: SolutionProvider {
                                       math: math,
                                       isFinalAnswer: true))
             }
-        } else if let prose = answer.prose, !prose.isEmpty {
+        } else if let prose, !prose.isEmpty {
             // The model sometimes answers this field in words -- "The
             // determinant of the matrix is 1". That is not maths and must not go
             // in a maths box, but it is still the answer, and dropping it left
             // the last *working* step marked as the conclusion instead.
-            items.append(StepItem(step: items.count + 1,
-                                  title: "Final answer",
-                                  explanation: prose,
-                                  math: nil,
-                                  isFinalAnswer: true))
+            if let last = items.last, last.math == nil, same(last.explanation, prose) {
+                items[items.count - 1].isFinalAnswer = true
+            } else {
+                items.append(StepItem(step: items.count + 1,
+                                      title: "Final answer",
+                                      explanation: prose,
+                                      math: nil,
+                                      isFinalAnswer: true))
+            }
         } else if !items.isEmpty {
             // Nothing usable in the field: fall back to the last step, which is
             // where the answer is if it is anywhere.
