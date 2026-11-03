@@ -58,9 +58,9 @@ public final class SolveCoordinator {
 
     /// Resolved per request, not cached, so a settings change takes effect on
     /// the next fetch rather than at the next launch.
-    private let provider: @Sendable () -> any SolutionProvider
+    private let provider: @MainActor @Sendable () -> any SolutionProvider
 
-    public init(provider: @escaping @Sendable () -> any SolutionProvider) {
+    public init(provider: @escaping @MainActor @Sendable () -> any SolutionProvider) {
         self.provider = provider
     }
 
