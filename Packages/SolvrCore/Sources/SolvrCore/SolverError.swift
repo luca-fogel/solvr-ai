@@ -54,8 +54,15 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
         switch self {
         case .invalidResponse:
             return "The model returned something that could not be read."
-        case .apiError(let message):
-            return message
+        case .apiError:
+            // Not the message. It is whatever the framework said, which on an
+            // iOS 26.4 simulator was "The operation couldn't be completed.
+            // (FoundationModels.LanguageModelSession.GenerationError error -1.)"
+            // -- shown as the headline, and again underneath as the detail. The
+            // detail line keeps it; the sentence a student reads says what to do.
+            return "Apple Intelligence couldn't finish this answer. Try again in a moment. "
+                 + "If it keeps happening, check that Apple Intelligence is on and has "
+                 + "finished downloading in Settings."
         case .rateLimited:
             return "The model is busy with another part of this problem. Try again in a moment."
         case .decodingFailed(let context):
@@ -124,7 +131,7 @@ public enum SolverError: LocalizedError, Equatable, Sendable {
     public var title: String {
         switch self {
         case .invalidResponse: return "Unreadable Response"
-        case .apiError: return "Something Went Wrong"
+        case .apiError: return "Couldn't Generate an Answer"
         case .rateLimited: return "Model Busy"
         case .decodingFailed: return "Parsing Error"
         case .backendUnavailable: return "Model Unavailable"

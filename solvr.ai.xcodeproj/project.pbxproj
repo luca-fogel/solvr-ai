@@ -10,12 +10,28 @@
 		AA0000010000000000000003 /* SolvrCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000010000000000000002 /* SolvrCore */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AA0000010000000000000016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 228F7E862F75D99C008C2370 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 228F7E8D2F75D99C008C2370;
+			remoteInfo = solvr.ai;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		AA0000010000000000000010 /* solvrUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = solvrUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		228F7E8E2F75D99C008C2370 /* solvr.ai.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = solvr.ai.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000010000000000000004 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA0000010000000000000011 /* solvrUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = solvrUITests;
+			sourceTree = "<group>";
+		};
 		228F7E902F75D99C008C2370 /* solvr.ai */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = solvr.ai;
@@ -24,6 +40,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AA0000010000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		228F7E8B2F75D99C008C2370 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -40,6 +63,7 @@
 			children = (
 				AA0000010000000000000004 /* Signing.xcconfig */,
 				228F7E902F75D99C008C2370 /* solvr.ai */,
+				AA0000010000000000000011 /* solvrUITests */,
 				228F7E8F2F75D99C008C2370 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -48,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				228F7E8E2F75D99C008C2370 /* solvr.ai.app */,
+				AA0000010000000000000010 /* solvrUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,6 +80,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AA0000010000000000000012 /* solvrUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000010000000000000018 /* Build configuration list for PBXNativeTarget "solvrUITests" */;
+			buildPhases = (
+				AA0000010000000000000013 /* Sources */,
+				AA0000010000000000000014 /* Frameworks */,
+				AA0000010000000000000015 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0000010000000000000017 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000010000000000000011 /* solvrUITests */,
+			);
+			name = solvrUITests;
+			productName = solvrUITests;
+			productReference = AA0000010000000000000010 /* solvrUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		228F7E8D2F75D99C008C2370 /* solvr.ai */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 228F7E992F75D99D008C2370 /* Build configuration list for PBXNativeTarget "solvr.ai" */;
@@ -91,6 +137,10 @@
 					228F7E8D2F75D99C008C2370 = {
 						CreatedOnToolsVersion = 26.3;
 					};
+					AA0000010000000000000012 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 228F7E8D2F75D99C008C2370;
+					};
 				};
 			};
 			buildConfigurationList = 228F7E892F75D99C008C2370 /* Build configuration list for PBXProject "solvr.ai" */;
@@ -111,11 +161,19 @@
 			projectRoot = "";
 			targets = (
 				228F7E8D2F75D99C008C2370 /* solvr.ai */,
+				AA0000010000000000000012 /* solvrUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AA0000010000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		228F7E8C2F75D99C008C2370 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -126,6 +184,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AA0000010000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		228F7E8A2F75D99C008C2370 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -135,7 +200,55 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AA0000010000000000000017 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 228F7E8D2F75D99C008C2370 /* solvr.ai */;
+			targetProxy = AA0000010000000000000016 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		AA0000010000000000000019 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000010000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Lulu.solvr-aiUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = solvr.ai;
+			};
+			name = Debug;
+		};
+		AA000001000000000000001A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000010000000000000004 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Lulu.solvr-aiUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = solvr.ai;
+			};
+			name = Release;
+		};
 		228F7E972F75D99D008C2370 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -350,6 +463,15 @@
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
+		AA0000010000000000000018 /* Build configuration list for PBXNativeTarget "solvrUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000010000000000000019 /* Debug */,
+				AA000001000000000000001A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		228F7E892F75D99C008C2370 /* Build configuration list for PBXProject "solvr.ai" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

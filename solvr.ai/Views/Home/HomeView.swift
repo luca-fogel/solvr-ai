@@ -194,8 +194,9 @@ struct HomeView: View {
             macTextInput
                 .padding(.horizontal, 40)
 
-            // Paste hint
-            Text("\u{2318}V to paste a screenshot")
+            // Paste hint. It used to say "⌘V to paste a screenshot", and nothing
+            // in the app handles ⌘V -- the button above is the paste path.
+            Text("Copy a screenshot, then click Paste from Clipboard")
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.textTertiary)
                 .padding(.top, 12)
@@ -266,6 +267,10 @@ struct HomeView: View {
                     Button {
                         if let image = UIPasteboard.general.image {
                             onSolveFromImage?(image)
+                        } else {
+                            // It used to do nothing at all, which looks broken.
+                            viewModel.errorMessage = "There's no image on the clipboard. "
+                                + "Copy a screenshot of the problem first, then click Paste."
                         }
                     } label: {
                         Label("Paste from Clipboard", systemImage: "doc.on.clipboard")

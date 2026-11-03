@@ -31,15 +31,44 @@ public enum MathNotation {
         // that KaTeX then chokes on.
         let cleaned = literalNewlines(raw)
         let evidence = cleaned.replacingOccurrences(of: "\\quad", with: "")
-        guard needsConversion(evidence) else { return cleaned }
+        guard needsConversion(evidence) else { return connectives(leadingEquals(cleaned)) }
 
-        var s = radicals(cleaned)
+        var s = radicals(leadingEquals(cleaned))
         s = substituteSymbols(s)
         s = bracketedLimits(s)
         s = functionCalls(s)
         s = braceExponents(s, marker: "^")
         s = braceExponents(s, marker: "_")
-        return s.trimmingCharacters(in: .whitespaces)
+        return connectives(s.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// `x = 1/2 or x = -2` -> `x = 1/2 \text{ or } x = -2`.
+    ///
+    /// Maths mode ignores spaces and sets letters as variables, so the model's
+    /// own way of writing two answers rendered as "1/2orx". Seen on the Lesson
+    /// tab as "10andx - y = 4", and it is how the quadratic's final answer is
+    /// written on every run. The same happens to the words it uses to link two
+    /// statements: "Let u = x^2. Then f(x) = sin(u)" rendered as
+    /// "Letu = x².Thenf(x)". Only a listed word standing alone -- at the start
+    /// or after a space, and before a space -- moves, and a string that already
+    /// uses `\text{` is left as the model wrote it.
+    /// `= 2x = 14` -> `2x = 14`.
+    ///
+    /// The model sometimes writes a step as the continuation of the one before,
+    /// so the box opens on a bare equals sign. On its own line that reads as a
+    /// typo. Left alone when nothing follows it.
+    static func leadingEquals(_ s: String) -> String {
+        let stripped = s.replacingOccurrences(of: #"^\s*=\s*"#, with: "",
+                                              options: .regularExpression)
+        return stripped.isEmpty ? s : stripped
+    }
+
+    static func connectives(_ s: String) -> String {
+        guard !s.contains("\\text{") else { return s }
+        let words = "and|or|Let|let|Then|then|So|so|where|is|if|for|when|with|at|evaluated"
+        return s.replacingOccurrences(of: "(?<=^| )(\(words))(?= )",
+                                      with: #"\\text{ $1 }"#,
+                                      options: .regularExpression)
     }
 
     /// Whether a field meant to hold mathematics actually holds a sentence.
@@ -184,6 +213,57 @@ public enum MathNotation {
                 // The `n` was a newline; whatever followed it is content.
                 out += " \\quad "
                 index = s.index(index, offsetBy: 2)
+            }
+        }
+        return out
+    }
+
+    /// Put back the backslashes a JSON decoder turned into control characters.
+    ///
+    /// Guided generation writes its output as JSON and decodes it inside the
+    /// framework, so `LLMJSON`'s repair-before-decode rule never gets a say. A
+    /// model that writes `\frac{14}{2}` in a maths field arrives here as a form
+    /// feed followed by `rac{14}{2}`, and `\boxed` as a backspace and `oxed`.
+    /// Measured with "Solve the system of equations: x + y = 10 and x - y = 4":
+    /// the steps came back correct and rendered as `rac` and `oxed`.
+    ///
+    /// Each control character goes back to the two characters the model wrote,
+    /// so the rest of the pipeline sees what it would have seen without the
+    /// decoder. A form feed or backspace never means anything in a maths field,
+    /// so those always go back. A newline always goes back to `\n`, because
+    /// `literalNewlines` already knows `\neq` from a line break. A tab or
+    /// carriage return goes back only in front of a command `LLMJSON` knows
+    /// begins with that letter, and is otherwise just a space.
+    ///
+    /// `inProse` is for the sentence fields. The model writes LaTeX there too,
+    /// against its instructions, and the same decoder leaves a box glyph where
+    /// `\frac` was -- "⌧rac{40}{8}" in a step's explanation. Prose keeps its
+    /// newlines, which are real there.
+    public static func restoringEatenEscapes(_ s: String, inProse: Bool = false) -> String {
+        var letters: [Character: Character] = [
+            "\u{08}": "b", "\u{0C}": "f", "\n": "n", "\t": "t", "\r": "r",
+        ]
+        if inProse { letters["\n"] = nil }
+        guard s.contains(where: { letters[$0] != nil }) else { return s }
+        var out = ""
+        var index = s.startIndex
+        while index < s.endIndex {
+            let c = s[index]
+            index = s.index(after: index)
+            guard let letter = letters[c] else {
+                out.append(c)
+                continue
+            }
+            if letter == "t" || letter == "r" {
+                var end = index
+                while end < s.endIndex, s[end].isLetter { end = s.index(after: end) }
+                let word = String(letter) + s[index..<end]
+                let isCommand = LLMJSON.ambiguousLaTeXCommands.contains {
+                    $0.first == letter && word.hasPrefix($0)
+                }
+                out += isCommand ? "\\\(letter)" : " "
+            } else {
+                out += "\\\(letter)"
             }
         }
         return out

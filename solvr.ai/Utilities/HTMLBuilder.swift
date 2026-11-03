@@ -63,9 +63,16 @@ enum HTMLBuilder {
     // MARK: - Lesson HTML
 
     static func buildLessonHTML(lesson: LessonContent) -> String {
+        // The on-device model usually gives the same words for both, which put
+        // "Systems of Equations" directly above "SYSTEMS OF EQUATIONS".
+        let sameAsTitle = lesson.topic.trimmingCharacters(in: .whitespaces)
+            .caseInsensitiveCompare(lesson.title.trimmingCharacters(in: .whitespaces)) == .orderedSame
+        let topic = sameAsTitle || lesson.topic.isEmpty
+            ? ""
+            : "<div class=\"lesson-topic\">\(escapeHTML(lesson.topic.uppercased()))</div>"
         var body = """
         <div class="lesson-title">\(escapeHTML(lesson.title))</div>
-        <div class="lesson-topic">\(escapeHTML(lesson.topic.uppercased()))</div>
+        \(topic)
         <div class="divider"></div>
         <div class="lesson-intro">\(processInlineMath(escapeHTML(lesson.introduction)))</div>
         """

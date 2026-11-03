@@ -31,7 +31,9 @@ class GradingSecurityTests(unittest.TestCase):
         for answer, expected in [('2/4', '0.5'), (r'\frac{1}{2}', '0.5'),
                                  ('sqrt(4)', '2'), ('pi/6', r'\pi/6'),
                                  ('x^2 + 2*x + 1', '(x+1)^2'), ('2x', '2*x'),
-                                 ('x = 2 or x = 3', '2, 3')]:
+                                 ('x = 2 or x = 3', '2, 3'),
+                                 (r'x = 2 \text{ or } x = 3', 'x = 2 or x = 3'),
+                                 (r'x = 1/2 \text{ or } x = -2', '1/2, -2')]:
             with self.subTest(answer=answer):
                 self.assertTrue(grader.grade({'finalAnswer': answer, 'expectedAnswer': expected})[0])
 

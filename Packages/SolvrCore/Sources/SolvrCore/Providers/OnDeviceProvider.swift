@@ -234,7 +234,7 @@ public final class OnDeviceProvider: SolutionProvider {
             """,
             prompt: "Solve this problem step by step: \(text)")
 
-        var items = solution.steps.enumerated().map { index, step in
+        let items = solution.steps.enumerated().map { index, step in
             // Measured, not defensive: this model returns correct maths in the
             // wrong notation no matter how the guide is worded -- and sometimes
             // returns a whole sentence, which renders as garbled italics and
@@ -243,7 +243,8 @@ public final class OnDeviceProvider: SolutionProvider {
             let rendered = renderMath(step.math, surface: "steps")
             return StepItem(step: index + 1,
                             title: step.title,
-                            explanation: Self.merging(step.explanation, prose: rendered.prose),
+                            explanation: Self.merging(Self.prose(step.explanation),
+                                                      prose: rendered.prose),
                             math: rendered.math)
         }
 
@@ -252,8 +253,27 @@ public final class OnDeviceProvider: SolutionProvider {
         // step that shows any working", which is a guess that is wrong exactly
         // when the solution was cut short -- the case where being wrong matters.
         let answer = renderMath(solution.finalAnswer, surface: "steps")
-        if let math = answer.math, !math.isEmpty {
-            if items.last?.math == math {
+        return Self.attachingFinalAnswer(to: items, math: answer.math, prose: answer.prose)
+    }
+
+    /// Mark the conclusion, adding a "Final answer" step only when the working
+    /// does not already end on it.
+    ///
+    /// Pure so it can be tested without a model. The comparison ignores spacing
+    /// because the model restates its last line with different spacing --
+    /// `(x, y) = (7, 3)` after `(x,y) = (7,3)` -- and a word answer counts as
+    /// already given when the last step says the same sentence. Both showed up
+    /// on screen as the answer printed twice in a row.
+    static func attachingFinalAnswer(to steps: [StepItem], math: String?,
+                                     prose: String?) -> [StepItem] {
+        var items = steps
+        func same(_ a: String?, _ b: String?) -> Bool {
+            guard let a, let b else { return false }
+            let squash = { (s: String) in s.filter { !$0.isWhitespace }.lowercased() }
+            return !squash(a).isEmpty && squash(a) == squash(b)
+        }
+        if let math, !math.isEmpty {
+            if same(items.last?.math, math) {
                 items[items.count - 1].isFinalAnswer = true
             } else {
                 items.append(StepItem(step: items.count + 1,
@@ -262,16 +282,20 @@ public final class OnDeviceProvider: SolutionProvider {
                                       math: math,
                                       isFinalAnswer: true))
             }
-        } else if let prose = answer.prose, !prose.isEmpty {
+        } else if let prose, !prose.isEmpty {
             // The model sometimes answers this field in words -- "The
             // determinant of the matrix is 1". That is not maths and must not go
             // in a maths box, but it is still the answer, and dropping it left
             // the last *working* step marked as the conclusion instead.
-            items.append(StepItem(step: items.count + 1,
-                                  title: "Final answer",
-                                  explanation: prose,
-                                  math: nil,
-                                  isFinalAnswer: true))
+            if let last = items.last, last.math == nil, same(last.explanation, prose) {
+                items[items.count - 1].isFinalAnswer = true
+            } else {
+                items.append(StepItem(step: items.count + 1,
+                                      title: "Final answer",
+                                      explanation: prose,
+                                      math: nil,
+                                      isFinalAnswer: true))
+            }
         } else if !items.isEmpty {
             // Nothing usable in the field: fall back to the last step, which is
             // where the answer is if it is anywhere.
@@ -294,15 +318,15 @@ public final class OnDeviceProvider: SolutionProvider {
         return LessonContent(
             title: lesson.title,
             topic: lesson.topic,
-            introduction: lesson.introduction,
+            introduction: Self.prose(lesson.introduction),
             sections: lesson.sections.map {
                 LessonContent.LessonSection(heading: $0.heading,
-                                            content: $0.content,
+                                            content: Self.prose($0.content),
                                             formula: renderableMath($0.formula, surface: "lesson"),
                                             note: nil,
                                             steps: nil)
             },
-            keyTakeaway: lesson.keyTakeaway)
+            keyTakeaway: Self.prose(lesson.keyTakeaway))
     }
 
     public func formulas(for question: String) async throws -> [FormulaItem] {
@@ -315,7 +339,7 @@ public final class OnDeviceProvider: SolutionProvider {
         return generated.formulas.map {
             FormulaItem(name: $0.name,
                         formula: renderableMath($0.formula, surface: "formulas") ?? "",
-                        description: $0.description)
+                        description: Self.prose($0.description))
         }
     }
 
@@ -385,7 +409,10 @@ public final class OnDeviceProvider: SolutionProvider {
     /// sideways, so it must not go in the maths box, but it is still something
     /// the model meant to say and the caller folds it into the explanation.
     private func renderMath(_ raw: String, surface: String) -> RenderedMath {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Before trimming: a form feed is whitespace to `trimmingCharacters`,
+        // so a field that opens with `\frac` would lose its backslash for good.
+        let trimmed = MathNotation.restoringEatenEscapes(raw)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return RenderedMath(math: nil, prose: nil)
         }
@@ -398,6 +425,12 @@ public final class OnDeviceProvider: SolutionProvider {
         traceMath?(MathTrace(surface: surface, raw: trimmed,
                              rendered: converted, droppedAsProse: false))
         return RenderedMath(math: converted, prose: nil)
+    }
+
+    /// A sentence field, with any backslash the decoder ate put back -- so
+    /// stray LaTeX shows as LaTeX rather than as a box glyph and half a word.
+    static func prose(_ raw: String) -> String {
+        MathNotation.restoringEatenEscapes(raw, inProse: true)
     }
 
     /// A maths field for a surface that has nowhere to put a stray sentence.

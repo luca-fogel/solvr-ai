@@ -115,6 +115,7 @@ struct ResultsView: View {
                     .foregroundStyle(Theme.Colors.textPrimary)
                     .frame(width: 40, height: 40)
             }
+            .accessibilityLabel("Back")
 
             Spacer()
 
@@ -130,6 +131,7 @@ struct ResultsView: View {
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .frame(width: 40, height: 40)
             }
+            .accessibilityLabel("Share")
         }
         .padding(.horizontal, Theme.Spacing.md)
     }

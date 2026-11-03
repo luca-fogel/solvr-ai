@@ -193,6 +193,67 @@ struct MathNotationRenderFailureTests {
         #expect(MathNotation.toLaTeX(#"sin(θ) = 1/2 \nθ = π/6"#).contains(#"\quad"#))
     }
 
+    @Test("backslashes the JSON decoder ate are put back")
+    func eatenEscapesRestored() {
+        // Verbatim from an on-device run: `\frac` and `\boxed` arrived as a
+        // form feed and a backspace in front of the rest of the word.
+        #expect(MathNotation.restoringEatenEscapes("\u{0C}rac{2x}{2} = \u{0C}rac{14}{2}")
+                == #"\frac{2x}{2} = \frac{14}{2}"#)
+        #expect(MathNotation.restoringEatenEscapes("\u{08}oxed{x = 7}") == #"\boxed{x = 7}"#)
+        #expect(MathNotation.restoringEatenEscapes("2 \u{09}imes 3") == #"2 \times 3"#)
+        #expect(MathNotation.restoringEatenEscapes("\u{0D}ight)") == #"\right)"#)
+        // A tab in front of anything else was whitespace all along.
+        #expect(MathNotation.restoringEatenEscapes("a\u{09}= 1") == "a = 1")
+        // A newline goes back to `\n`, and `toLaTeX` tells `\neq` from a break.
+        #expect(MathNotation.toLaTeX(MathNotation.restoringEatenEscapes("x \neq y")) == #"x \neq y"#)
+        #expect(MathNotation.toLaTeX(MathNotation.restoringEatenEscapes("x + y = 10\nx - y = 4"))
+                .contains(#"\quad"#))
+        #expect(MathNotation.restoringEatenEscapes(#"\frac{1}{2}"#) == #"\frac{1}{2}"#)
+    }
+
+    @Test("a word joining two answers is set as a word, not as variables")
+    func connectivesAreText() throws {
+        // Both verbatim from on-device runs.
+        #expect(MathNotation.toLaTeX("x = 1/2 or x = -2") == #"x = 1/2 \text{ or } x = -2"#)
+        #expect(MathNotation.toLaTeX("x + y = 10 and x - y = 4")
+                == #"x + y = 10 \text{ and } x - y = 4"#)
+        // Already words: untouched. Inside another token: untouched.
+        #expect(MathNotation.toLaTeX(#"x = 1 \text{ or } x = 2"#) == #"x = 1 \text{ or } x = 2"#)
+        #expect(MathNotation.toLaTeX("a_{or} + band = 3") == "a_{or} + band = 3")
+        let katex = try KaTeXOracle()
+        #expect(katex.renders(MathNotation.toLaTeX("x = 1/2 or x = -2")))
+    }
+
+    @Test("a step that opens on a bare equals sign loses it")
+    func leadingEqualsDropped() {
+        // Verbatim from an iOS run.
+        #expect(MathNotation.toLaTeX("= 2x = 14") == "2x = 14")
+        #expect(MathNotation.toLaTeX("= x = 7") == "x = 7")
+        #expect(MathNotation.toLaTeX("x = 7") == "x = 7")
+        #expect(MathNotation.toLaTeX("=") == "=")
+    }
+
+    @Test("linking words between two statements are set as words")
+    func linkingWordsAreText() throws {
+        // Verbatim from a Mac run, which rendered as "Letu = x².Thenf(x)".
+        let out = MathNotation.toLaTeX("Let u = x^2. Then f(x) = sin(u)")
+        #expect(out.hasPrefix(#"\text{ Let } u"#))
+        #expect(out.contains(#"\text{ Then } f(x)"#))
+        // Inside a longer token, or a variable that happens to be a letter of
+        // one: untouched.
+        #expect(MathNotation.toLaTeX("isotope + a = 3") == "isotope + a = 3")
+        #expect(try KaTeXOracle().renders(out))
+    }
+
+    @Test("restored output renders, where the decoded string did not")
+    func eatenEscapesRender() throws {
+        let katex = try KaTeXOracle()
+        let observed = "2x = 14 \u{0C}rac{2x}{2} = \u{0C}rac{14}{2} \u{08}oxed{x = 7}"
+        let restored = MathNotation.toLaTeX(MathNotation.restoringEatenEscapes(observed))
+        #expect(restored.contains(#"\frac{2x}{2}"#))
+        #expect(katex.renders(restored))
+    }
+
     @Test("commands that really do start with n survive")
     func realCommandsSurvive() {
         // `x \neq y` has a space before the backslash exactly like the broken
