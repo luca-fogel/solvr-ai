@@ -234,7 +234,7 @@ public final class OnDeviceProvider: SolutionProvider {
             """,
             prompt: "Solve this problem step by step: \(text)")
 
-        var items = solution.steps.enumerated().map { index, step in
+        let items = solution.steps.enumerated().map { index, step in
             // Measured, not defensive: this model returns correct maths in the
             // wrong notation no matter how the guide is worded -- and sometimes
             // returns a whole sentence, which renders as garbled italics and
