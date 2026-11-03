@@ -39,4 +39,17 @@ struct SurfaceStateTests {
         #expect(!SurfaceState<[Int]>.empty.isIdle)
         #expect(SurfaceState<[Int]>.idle.isIdle)
     }
+
+    /// Verbatim from an iOS 26.4 simulator, which reports the model available
+    /// and then fails every request with this.
+    @Test("an unrecognised framework failure is explained, not quoted")
+    func unrecognisedFailureIsExplained() {
+        let raw = "The operation couldn’t be completed. "
+            + "(FoundationModels.LanguageModelSession.GenerationError error -1.)"
+        let error = SolverError.apiError(raw)
+        #expect(error.errorDescription?.contains("FoundationModels") == false)
+        #expect(error.errorDescription?.contains("Apple Intelligence") == true)
+        #expect(error.debugDetail == raw)   // kept, in the small print
+        #expect(error.isRetryable)
+    }
 }
