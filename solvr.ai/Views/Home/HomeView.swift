@@ -267,6 +267,10 @@ struct HomeView: View {
                     Button {
                         if let image = UIPasteboard.general.image {
                             onSolveFromImage?(image)
+                        } else {
+                            // It used to do nothing at all, which looks broken.
+                            viewModel.errorMessage = "There's no image on the clipboard. "
+                                + "Copy a screenshot of the problem first, then click Paste."
                         }
                     } label: {
                         Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
