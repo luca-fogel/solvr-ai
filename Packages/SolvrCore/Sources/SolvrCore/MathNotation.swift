@@ -189,6 +189,51 @@ public enum MathNotation {
         return out
     }
 
+    /// Put back the backslashes a JSON decoder turned into control characters.
+    ///
+    /// Guided generation writes its output as JSON and decodes it inside the
+    /// framework, so `LLMJSON`'s repair-before-decode rule never gets a say. A
+    /// model that writes `\frac{14}{2}` in a maths field arrives here as a form
+    /// feed followed by `rac{14}{2}`, and `\boxed` as a backspace and `oxed`.
+    /// Measured with "Solve the system of equations: x + y = 10 and x - y = 4":
+    /// the steps came back correct and rendered as `rac` and `oxed`.
+    ///
+    /// Each control character goes back to the two characters the model wrote,
+    /// so the rest of the pipeline sees what it would have seen without the
+    /// decoder. A form feed or backspace never means anything in a maths field,
+    /// so those always go back. A newline always goes back to `\n`, because
+    /// `literalNewlines` already knows `\neq` from a line break. A tab or
+    /// carriage return goes back only in front of a command `LLMJSON` knows
+    /// begins with that letter, and is otherwise just a space.
+    public static func restoringEatenEscapes(_ s: String) -> String {
+        let letters: [Character: Character] = [
+            "\u{08}": "b", "\u{0C}": "f", "\n": "n", "\t": "t", "\r": "r",
+        ]
+        guard s.contains(where: { letters[$0] != nil }) else { return s }
+        var out = ""
+        var index = s.startIndex
+        while index < s.endIndex {
+            let c = s[index]
+            index = s.index(after: index)
+            guard let letter = letters[c] else {
+                out.append(c)
+                continue
+            }
+            if letter == "t" || letter == "r" {
+                var end = index
+                while end < s.endIndex, s[end].isLetter { end = s.index(after: end) }
+                let word = String(letter) + s[index..<end]
+                let isCommand = LLMJSON.ambiguousLaTeXCommands.contains {
+                    $0.first == letter && word.hasPrefix($0)
+                }
+                out += isCommand ? "\\\(letter)" : " "
+            } else {
+                out += "\\\(letter)"
+            }
+        }
+        return out
+    }
+
     /// Real LaTeX commands starting with `n`, longest first is not needed --
     /// the whole letter run is matched at once.
     private static let nCommands: Set<String> = [

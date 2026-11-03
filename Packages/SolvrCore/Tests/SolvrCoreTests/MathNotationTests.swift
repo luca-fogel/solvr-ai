@@ -193,6 +193,33 @@ struct MathNotationRenderFailureTests {
         #expect(MathNotation.toLaTeX(#"sin(θ) = 1/2 \nθ = π/6"#).contains(#"\quad"#))
     }
 
+    @Test("backslashes the JSON decoder ate are put back")
+    func eatenEscapesRestored() {
+        // Verbatim from an on-device run: `\frac` and `\boxed` arrived as a
+        // form feed and a backspace in front of the rest of the word.
+        #expect(MathNotation.restoringEatenEscapes("\u{0C}rac{2x}{2} = \u{0C}rac{14}{2}")
+                == #"\frac{2x}{2} = \frac{14}{2}"#)
+        #expect(MathNotation.restoringEatenEscapes("\u{08}oxed{x = 7}") == #"\boxed{x = 7}"#)
+        #expect(MathNotation.restoringEatenEscapes("2 \u{09}imes 3") == #"2 \times 3"#)
+        #expect(MathNotation.restoringEatenEscapes("\u{0D}ight)") == #"\right)"#)
+        // A tab in front of anything else was whitespace all along.
+        #expect(MathNotation.restoringEatenEscapes("a\u{09}= 1") == "a = 1")
+        // A newline goes back to `\n`, and `toLaTeX` tells `\neq` from a break.
+        #expect(MathNotation.toLaTeX(MathNotation.restoringEatenEscapes("x \neq y")) == #"x \neq y"#)
+        #expect(MathNotation.toLaTeX(MathNotation.restoringEatenEscapes("x + y = 10\nx - y = 4"))
+                .contains(#"\quad"#))
+        #expect(MathNotation.restoringEatenEscapes(#"\frac{1}{2}"#) == #"\frac{1}{2}"#)
+    }
+
+    @Test("restored output renders, where the decoded string did not")
+    func eatenEscapesRender() throws {
+        let katex = try KaTeXOracle()
+        let observed = "2x = 14 \u{0C}rac{2x}{2} = \u{0C}rac{14}{2} \u{08}oxed{x = 7}"
+        let restored = MathNotation.toLaTeX(MathNotation.restoringEatenEscapes(observed))
+        #expect(restored.contains(#"\frac{2x}{2}"#))
+        #expect(katex.renders(restored))
+    }
+
     @Test("commands that really do start with n survive")
     func realCommandsSurvive() {
         // `x \neq y` has a space before the backslash exactly like the broken

@@ -385,7 +385,10 @@ public final class OnDeviceProvider: SolutionProvider {
     /// sideways, so it must not go in the maths box, but it is still something
     /// the model meant to say and the caller folds it into the explanation.
     private func renderMath(_ raw: String, surface: String) -> RenderedMath {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Before trimming: a form feed is whitespace to `trimmingCharacters`,
+        // so a field that opens with `\frac` would lose its backslash for good.
+        let trimmed = MathNotation.restoringEatenEscapes(raw)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return RenderedMath(math: nil, prose: nil)
         }
