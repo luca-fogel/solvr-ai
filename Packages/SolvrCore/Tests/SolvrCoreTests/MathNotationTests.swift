@@ -224,6 +224,15 @@ struct MathNotationRenderFailureTests {
         #expect(katex.renders(MathNotation.toLaTeX("x = 1/2 or x = -2")))
     }
 
+    @Test("a step that opens on a bare equals sign loses it")
+    func leadingEqualsDropped() {
+        // Verbatim from an iOS run.
+        #expect(MathNotation.toLaTeX("= 2x = 14") == "2x = 14")
+        #expect(MathNotation.toLaTeX("= x = 7") == "x = 7")
+        #expect(MathNotation.toLaTeX("x = 7") == "x = 7")
+        #expect(MathNotation.toLaTeX("=") == "=")
+    }
+
     @Test("linking words between two statements are set as words")
     func linkingWordsAreText() throws {
         // Verbatim from a Mac run, which rendered as "Letu = x².Thenf(x)".

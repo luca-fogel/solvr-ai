@@ -31,9 +31,9 @@ public enum MathNotation {
         // that KaTeX then chokes on.
         let cleaned = literalNewlines(raw)
         let evidence = cleaned.replacingOccurrences(of: "\\quad", with: "")
-        guard needsConversion(evidence) else { return connectives(cleaned) }
+        guard needsConversion(evidence) else { return connectives(leadingEquals(cleaned)) }
 
-        var s = radicals(cleaned)
+        var s = radicals(leadingEquals(cleaned))
         s = substituteSymbols(s)
         s = bracketedLimits(s)
         s = functionCalls(s)
@@ -52,6 +52,17 @@ public enum MathNotation {
     /// "Letu = x².Thenf(x)". Only a listed word standing alone -- at the start
     /// or after a space, and before a space -- moves, and a string that already
     /// uses `\text{` is left as the model wrote it.
+    /// `= 2x = 14` -> `2x = 14`.
+    ///
+    /// The model sometimes writes a step as the continuation of the one before,
+    /// so the box opens on a bare equals sign. On its own line that reads as a
+    /// typo. Left alone when nothing follows it.
+    static func leadingEquals(_ s: String) -> String {
+        let stripped = s.replacingOccurrences(of: #"^\s*=\s*"#, with: "",
+                                              options: .regularExpression)
+        return stripped.isEmpty ? s : stripped
+    }
+
     static func connectives(_ s: String) -> String {
         guard !s.contains("\\text{") else { return s }
         let words = "and|or|Let|let|Then|then|So|so|where|is|if|for|when|with|at|evaluated"
