@@ -31,7 +31,7 @@ public enum MathNotation {
         // that KaTeX then chokes on.
         let cleaned = literalNewlines(raw)
         let evidence = cleaned.replacingOccurrences(of: "\\quad", with: "")
-        guard needsConversion(evidence) else { return cleaned }
+        guard needsConversion(evidence) else { return connectives(cleaned) }
 
         var s = radicals(cleaned)
         s = substituteSymbols(s)
@@ -39,7 +39,21 @@ public enum MathNotation {
         s = functionCalls(s)
         s = braceExponents(s, marker: "^")
         s = braceExponents(s, marker: "_")
-        return s.trimmingCharacters(in: .whitespaces)
+        return connectives(s.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// `x = 1/2 or x = -2` -> `x = 1/2 \text{ or } x = -2`.
+    ///
+    /// Maths mode ignores spaces and sets letters as variables, so the model's
+    /// own way of writing two answers rendered as "1/2orx". Seen on the Lesson
+    /// tab as "10andx - y = 4", and it is how the quadratic's final answer is
+    /// written on every run. Only a word standing alone between spaces moves,
+    /// and a string that already uses `\text{` is left as the model wrote it.
+    static func connectives(_ s: String) -> String {
+        guard !s.contains("\\text{") else { return s }
+        return s.replacingOccurrences(of: #"(?<= )(and|or)(?= )"#,
+                                      with: #"\\text{ $1 }"#,
+                                      options: .regularExpression)
     }
 
     /// Whether a field meant to hold mathematics actually holds a sentence.

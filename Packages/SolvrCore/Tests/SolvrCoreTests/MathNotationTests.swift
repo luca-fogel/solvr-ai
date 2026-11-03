@@ -211,6 +211,19 @@ struct MathNotationRenderFailureTests {
         #expect(MathNotation.restoringEatenEscapes(#"\frac{1}{2}"#) == #"\frac{1}{2}"#)
     }
 
+    @Test("a word joining two answers is set as a word, not as variables")
+    func connectivesAreText() throws {
+        // Both verbatim from on-device runs.
+        #expect(MathNotation.toLaTeX("x = 1/2 or x = -2") == #"x = 1/2 \text{ or } x = -2"#)
+        #expect(MathNotation.toLaTeX("x + y = 10 and x - y = 4")
+                == #"x + y = 10 \text{ and } x - y = 4"#)
+        // Already words: untouched. Inside another token: untouched.
+        #expect(MathNotation.toLaTeX(#"x = 1 \text{ or } x = 2"#) == #"x = 1 \text{ or } x = 2"#)
+        #expect(MathNotation.toLaTeX("a_{or} + band = 3") == "a_{or} + band = 3")
+        let katex = try KaTeXOracle()
+        #expect(katex.renders(MathNotation.toLaTeX("x = 1/2 or x = -2")))
+    }
+
     @Test("restored output renders, where the decoded string did not")
     func eatenEscapesRender() throws {
         let katex = try KaTeXOracle()
