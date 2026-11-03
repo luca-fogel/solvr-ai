@@ -12,6 +12,16 @@ import SwiftData
 
 @main
 struct solvr_aiApp: App {
+    init() {
+        // SwiftData creates its store file but not the folder the file lives in.
+        // On a fresh install that folder does not exist yet, so the first launch
+        // logged screens of CoreData errors ("Sandbox access to file-write-create
+        // denied") before recovering on its own. Creating it first keeps the
+        // console clean.
+        try? FileManager.default.createDirectory(at: .applicationSupportDirectory,
+                                                 withIntermediateDirectories: true)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
