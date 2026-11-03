@@ -234,10 +234,16 @@ public enum MathNotation {
     /// `literalNewlines` already knows `\neq` from a line break. A tab or
     /// carriage return goes back only in front of a command `LLMJSON` knows
     /// begins with that letter, and is otherwise just a space.
-    public static func restoringEatenEscapes(_ s: String) -> String {
-        let letters: [Character: Character] = [
+    ///
+    /// `inProse` is for the sentence fields. The model writes LaTeX there too,
+    /// against its instructions, and the same decoder leaves a box glyph where
+    /// `\frac` was -- "⌧rac{40}{8}" in a step's explanation. Prose keeps its
+    /// newlines, which are real there.
+    public static func restoringEatenEscapes(_ s: String, inProse: Bool = false) -> String {
+        var letters: [Character: Character] = [
             "\u{08}": "b", "\u{0C}": "f", "\n": "n", "\t": "t", "\r": "r",
         ]
+        if inProse { letters["\n"] = nil }
         guard s.contains(where: { letters[$0] != nil }) else { return s }
         var out = ""
         var index = s.startIndex

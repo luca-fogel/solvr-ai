@@ -36,6 +36,17 @@ struct OnDeviceProviderTests {
         #expect(out.last?.isFinalAnswer == true)
     }
 
+    /// Verbatim shape from a Mac run of the mean/standard-deviation problem.
+    @Test("prose gets its eaten backslashes back and keeps its newlines")
+    @available(macOS 26.0, iOS 26.0, *)
+    func proseRestored() {
+        let observed = "So, we have: \u{08}egin{equation} \u{0C}rac{40}{8} = 5 \u{09}ext{.\nNext line"
+        let out = OnDeviceProvider.prose(observed)
+        #expect(out == "So, we have: \\begin{equation} \\frac{40}{8} = 5 \\text{.\nNext line")
+        #expect(!out.contains("\u{0C}") && !out.contains("\u{08}"))
+        #expect(OnDeviceProvider.prose("Plain sentence.\nSecond.") == "Plain sentence.\nSecond.")
+    }
+
     @Test("a different answer is still added as its own step")
     @available(macOS 26.0, iOS 26.0, *)
     func differentAnswerAppended() {

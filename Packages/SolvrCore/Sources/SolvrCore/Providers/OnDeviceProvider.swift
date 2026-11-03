@@ -243,7 +243,8 @@ public final class OnDeviceProvider: SolutionProvider {
             let rendered = renderMath(step.math, surface: "steps")
             return StepItem(step: index + 1,
                             title: step.title,
-                            explanation: Self.merging(step.explanation, prose: rendered.prose),
+                            explanation: Self.merging(Self.prose(step.explanation),
+                                                      prose: rendered.prose),
                             math: rendered.math)
         }
 
@@ -317,15 +318,15 @@ public final class OnDeviceProvider: SolutionProvider {
         return LessonContent(
             title: lesson.title,
             topic: lesson.topic,
-            introduction: lesson.introduction,
+            introduction: Self.prose(lesson.introduction),
             sections: lesson.sections.map {
                 LessonContent.LessonSection(heading: $0.heading,
-                                            content: $0.content,
+                                            content: Self.prose($0.content),
                                             formula: renderableMath($0.formula, surface: "lesson"),
                                             note: nil,
                                             steps: nil)
             },
-            keyTakeaway: lesson.keyTakeaway)
+            keyTakeaway: Self.prose(lesson.keyTakeaway))
     }
 
     public func formulas(for question: String) async throws -> [FormulaItem] {
@@ -338,7 +339,7 @@ public final class OnDeviceProvider: SolutionProvider {
         return generated.formulas.map {
             FormulaItem(name: $0.name,
                         formula: renderableMath($0.formula, surface: "formulas") ?? "",
-                        description: $0.description)
+                        description: Self.prose($0.description))
         }
     }
 
@@ -424,6 +425,12 @@ public final class OnDeviceProvider: SolutionProvider {
         traceMath?(MathTrace(surface: surface, raw: trimmed,
                              rendered: converted, droppedAsProse: false))
         return RenderedMath(math: converted, prose: nil)
+    }
+
+    /// A sentence field, with any backslash the decoder ate put back -- so
+    /// stray LaTeX shows as LaTeX rather than as a box glyph and half a word.
+    static func prose(_ raw: String) -> String {
+        MathNotation.restoringEatenEscapes(raw, inProse: true)
     }
 
     /// A maths field for a surface that has nowhere to put a stray sentence.
