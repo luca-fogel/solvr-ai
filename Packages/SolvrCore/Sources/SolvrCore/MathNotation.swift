@@ -47,11 +47,15 @@ public enum MathNotation {
     /// Maths mode ignores spaces and sets letters as variables, so the model's
     /// own way of writing two answers rendered as "1/2orx". Seen on the Lesson
     /// tab as "10andx - y = 4", and it is how the quadratic's final answer is
-    /// written on every run. Only a word standing alone between spaces moves,
-    /// and a string that already uses `\text{` is left as the model wrote it.
+    /// written on every run. The same happens to the words it uses to link two
+    /// statements: "Let u = x^2. Then f(x) = sin(u)" rendered as
+    /// "Letu = x².Thenf(x)". Only a listed word standing alone -- at the start
+    /// or after a space, and before a space -- moves, and a string that already
+    /// uses `\text{` is left as the model wrote it.
     static func connectives(_ s: String) -> String {
         guard !s.contains("\\text{") else { return s }
-        return s.replacingOccurrences(of: #"(?<= )(and|or)(?= )"#,
+        let words = "and|or|Let|let|Then|then|So|so|where|is|if|for|when|with|at|evaluated"
+        return s.replacingOccurrences(of: "(?<=^| )(\(words))(?= )",
                                       with: #"\\text{ $1 }"#,
                                       options: .regularExpression)
     }

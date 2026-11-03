@@ -135,7 +135,7 @@ solvr.ai/
   Views/           Home · Scanner · Results (Steps/Lesson/Formulas/Videos/Chat) · History · Settings
   Utilities/       Theme, HTMLBuilder (KaTeX), PlatformHelper
   DemoMode/        fixtures, the drawn worksheet, the two on-device self tests
-Packages/SolvrCore/  the text handling that is worth testing, and its 114 tests
+Packages/SolvrCore/  the text handling that is worth testing, and its 115 tests
   Solve            one problem, resolved once — the only string a prompt is built from
   SolveBuilder     reads the photograph, and is the only way to make a Solve
   SolveCoordinator which surfaces have been asked for, and what came back
@@ -190,7 +190,7 @@ first run.
 ## Tests
 
 ```sh
-swift test --package-path Packages/SolvrCore    # 114 tests, ~2s, no simulator
+swift test --package-path Packages/SolvrCore    # 115 tests, ~2s, no simulator
 xcodebuild -scheme solvr.ai -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 xcodebuild -scheme solvr.ai -destination 'platform=macOS,variant=Mac Catalyst' build  # debug only
 ```

@@ -224,6 +224,18 @@ struct MathNotationRenderFailureTests {
         #expect(katex.renders(MathNotation.toLaTeX("x = 1/2 or x = -2")))
     }
 
+    @Test("linking words between two statements are set as words")
+    func linkingWordsAreText() throws {
+        // Verbatim from a Mac run, which rendered as "Letu = x².Thenf(x)".
+        let out = MathNotation.toLaTeX("Let u = x^2. Then f(x) = sin(u)")
+        #expect(out.hasPrefix(#"\text{ Let } u"#))
+        #expect(out.contains(#"\text{ Then } f(x)"#))
+        // Inside a longer token, or a variable that happens to be a letter of
+        // one: untouched.
+        #expect(MathNotation.toLaTeX("isotope + a = 3") == "isotope + a = 3")
+        #expect(try KaTeXOracle().renders(out))
+    }
+
     @Test("restored output renders, where the decoded string did not")
     func eatenEscapesRender() throws {
         let katex = try KaTeXOracle()
