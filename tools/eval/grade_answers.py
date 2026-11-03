@@ -130,6 +130,11 @@ SPLIT = re.compile(r"[,;]|\bor\b|\band\b", re.IGNORECASE)
 
 def parts(tex: str) -> list:
     """One answer, or the several an answer may contain."""
+    # The app sets a joining word as text -- "x = 2 \text{ or } x = 3" -- so
+    # that it renders as a word. Splitting on "or" first left "2 \text{" as a
+    # candidate and graded a correct pair of roots wrong. Unwrap before
+    # splitting; `normalise` already discards any \text{} that survives.
+    tex = re.sub(r"\\text\{([^{}]*)\}", r" \1 ", tex)
     pieces = [p.strip() for p in SPLIT.split(tex) if p.strip()]
     return pieces if len(pieces) > 1 else [tex]
 
