@@ -50,5 +50,13 @@ final class DemoPathUITests: XCTestCase {
             .containing(NSPredicate(format: "label CONTAINS[c] 'equation'")).firstMatch
         XCTAssertTrue(lesson.waitForExistence(timeout: 60), "no lesson within 60 s")
         add(XCTAttachment(screenshot: app.screenshot()))
+
+        // Leaving the results saves the problem, which is what makes History
+        // a fallback for a live demo.
+        app.buttons["Back"].tap()
+        let saved = app.staticTexts
+            .containing(NSPredicate(format: "label CONTAINS[c] 'system of equations'")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 10), "the problem was not saved to history")
+        add(XCTAttachment(screenshot: app.screenshot()))
     }
 }
